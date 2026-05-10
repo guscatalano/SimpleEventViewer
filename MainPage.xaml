@@ -6,6 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="using:SimpleEventViewer_WinUI"
     xmlns:models="using:SimpleEventViewer_WinUI.Models"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
@@ -36,62 +37,101 @@
         </Grid>
 
         <!-- Main content -->
-        <Grid Grid.Row="1" ColumnSpacing="8">
+        <Grid Grid.Row="1" ColumnSpacing="0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280" />
+                <ColumnDefinition x:Name="FilterColumn" Width="300" MinWidth="220" />
+                <ColumnDefinition x:Name="SplitterColumn" Width="Auto" />
+                <ColumnDefinition x:Name="CollapsedFilterColumn" Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left: Filters -->
-            <Border Grid.Column="0" Background="{ThemeResource LayerFillColorDefaultBrush}"
+            <!-- Left: Filters (visible when not collapsed) -->
+            <Border x:Name="FilterPanel" Grid.Column="0" Background="{ThemeResource LayerFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                    BorderThickness="1" CornerRadius="8">
-                <ScrollViewer>
-                    <StackPanel Padding="16" Spacing="16">
-                        <TextBlock Text="Filters" FontSize="18" FontWeight="SemiBold" />
+                    BorderThickness="1" CornerRadius="8" Margin="0,0,4,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Padding="16,12,8,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Filters" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Click="CollapseFilters_Click" Padding="6"
+                                ToolTipService.ToolTip="Collapse filters"
+                                Background="Transparent" BorderThickness="0">
+                            <FontIcon Glyph="&#xE76B;" FontSize="12" />
+                        </Button>
+                    </Grid>
+                    <ScrollViewer Grid.Row="1">
+                        <StackPanel Padding="16,4,16,16" Spacing="16">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Event Source" FontWeight="SemiBold" FontSize="13" />
+                                <ComboBox ItemsSource="{x:Bind ViewModel.SourceCategories, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedSource, Mode=TwoWay}"
+                                          DisplayMemberPath="Display"
+                                          HorizontalAlignment="Stretch" />
+                            </StackPanel>
 
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Event Source" FontWeight="SemiBold" FontSize="13" />
-                            <ComboBox ItemsSource="{x:Bind ViewModel.SourceCategories, Mode=OneWay}"
-                                      SelectedItem="{x:Bind ViewModel.SelectedSource, Mode=TwoWay}"
-                                      DisplayMemberPath="Display"
-                                      HorizontalAlignment="Stretch" />
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Event Level" FontWeight="SemiBold" FontSize="13" />
+                                <ComboBox ItemsSource="{x:Bind ViewModel.AvailableTypes, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedType, Mode=TwoWay}"
+                                          DisplayMemberPath="Name"
+                                          HorizontalAlignment="Stretch" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Time Range" FontWeight="SemiBold" FontSize="13" />
+                                <CalendarDatePicker x:Name="StartDatePicker"
+                                                    PlaceholderText="From"
+                                                    Date="{x:Bind ViewModel.StartTime, Mode=TwoWay, Converter={StaticResource DateOffsetConverter}}"
+                                                    HorizontalAlignment="Stretch" />
+                                <CalendarDatePicker x:Name="EndDatePicker"
+                                                    PlaceholderText="To"
+                                                    Date="{x:Bind ViewModel.EndTime, Mode=TwoWay, Converter={StaticResource DateOffsetConverter}}"
+                                                    HorizontalAlignment="Stretch" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Search" FontWeight="SemiBold" FontSize="13" />
+                                <TextBox PlaceholderText="Search messages..."
+                                         Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+
+                            <Button Content="Clear All Filters" Click="ClearFilters_Click"
+                                    HorizontalAlignment="Stretch" />
                         </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
 
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Event Level" FontWeight="SemiBold" FontSize="13" />
-                            <ComboBox ItemsSource="{x:Bind ViewModel.AvailableTypes, Mode=OneWay}"
-                                      SelectedItem="{x:Bind ViewModel.SelectedType, Mode=TwoWay}"
-                                      DisplayMemberPath="Name"
-                                      HorizontalAlignment="Stretch" />
-                        </StackPanel>
+            <!-- Grid splitter for resizing -->
+            <controls:ContentSizer x:Name="FilterSplitter" Grid.Column="1"
+                                   Width="6"
+                                   HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                                   TargetControl="{x:Bind FilterPanel}"
+                                   Orientation="Vertical" />
 
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Time Range" FontWeight="SemiBold" FontSize="13" />
-                            <DatePicker x:Name="StartDatePicker"
-                                        Header="From"
-                                        Date="{x:Bind ViewModel.StartTime, Mode=TwoWay, Converter={StaticResource DateOffsetConverter}}"
-                                        HorizontalAlignment="Stretch" />
-                            <DatePicker x:Name="EndDatePicker"
-                                        Header="To"
-                                        Date="{x:Bind ViewModel.EndTime, Mode=TwoWay, Converter={StaticResource DateOffsetConverter}}"
-                                        HorizontalAlignment="Stretch" />
-                        </StackPanel>
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Search" FontWeight="SemiBold" FontSize="13" />
-                            <TextBox PlaceholderText="Search messages..."
-                                     Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        </StackPanel>
-
-                        <Button Content="Clear All Filters" Click="ClearFilters_Click"
-                                HorizontalAlignment="Stretch" />
+            <!-- Collapsed filter button (only visible when collapsed) -->
+            <Border x:Name="CollapsedFilterButton" Grid.Column="2" Visibility="Collapsed"
+                    Margin="0,0,4,0" VerticalAlignment="Top">
+                <Button Click="ExpandFilters_Click" Padding="8"
+                        ToolTipService.ToolTip="Show filters"
+                        Background="{ThemeResource LayerFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1">
+                    <StackPanel Orientation="Vertical" Spacing="4">
+                        <FontIcon Glyph="&#xE71C;" FontSize="14" />
                     </StackPanel>
-                </ScrollViewer>
+                </Button>
             </Border>
 
             <!-- Right: Events + Details -->
-            <Grid Grid.Column="1" RowSpacing="8">
+            <Grid Grid.Column="3" RowSpacing="8" Margin="4,0,0,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" />
                     <RowDefinition Height="*" />
@@ -134,26 +174,32 @@
                             </ListView.ItemContainerStyle>
                             <ListView.ItemTemplate>
                                 <DataTemplate x:DataType="models:EventLogEntry">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="160" />
-                                            <ColumnDefinition Width="80" />
-                                            <ColumnDefinition Width="60" />
-                                            <ColumnDefinition Width="180" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Bind TimeCreatedDisplay}" VerticalAlignment="Center" />
-                                        <Border Grid.Column="1" CornerRadius="4" Padding="6,2" Margin="0,0,8,0"
-                                                HorizontalAlignment="Left"
-                                                Background="{x:Bind Level, Converter={StaticResource LevelToBrushConverter}}">
-                                            <TextBlock Text="{x:Bind LevelName}"
-                                                       Foreground="{x:Bind Level, Converter={StaticResource LevelToTextBrushConverter}}"
-                                                       FontSize="11" FontWeight="SemiBold" />
-                                        </Border>
-                                        <TextBlock Grid.Column="2" Text="{x:Bind Id}" VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="3" Text="{x:Bind ProviderName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="4" Text="{x:Bind Message}" TextTrimming="CharacterEllipsis" MaxLines="1" VerticalAlignment="Center" />
-                                    </Grid>
+                                    <Border Background="{x:Bind Level, Converter={StaticResource LevelToRowBrushConverter}}"
+                                            CornerRadius="4" Padding="4,2">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="80" />
+                                                <ColumnDefinition Width="60" />
+                                                <ColumnDefinition Width="180" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{x:Bind TimeCreatedDisplay}" VerticalAlignment="Center" />
+                                            <Border Grid.Column="1" CornerRadius="4" Padding="6,2" Margin="0,0,8,0"
+                                                    HorizontalAlignment="Left"
+                                                    Visibility="{x:Bind Level, Converter={StaticResource BadgeVisibilityConverter}}"
+                                                    Background="{x:Bind Level, Converter={StaticResource LevelToBrushConverter}}">
+                                                <TextBlock Text="{x:Bind LevelName}"
+                                                           Foreground="{x:Bind Level, Converter={StaticResource LevelToTextBrushConverter}}"
+                                                           FontSize="11" FontWeight="SemiBold" />
+                                            </Border>
+                                            <TextBlock Grid.Column="1" Text="{x:Bind LevelName}" VerticalAlignment="Center"
+                                                       Visibility="{x:Bind Level, Converter={StaticResource PlainLevelVisibilityConverter}}" />
+                                            <TextBlock Grid.Column="2" Text="{x:Bind Id}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="3" Text="{x:Bind ProviderName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="4" Text="{x:Bind Message}" TextTrimming="CharacterEllipsis" MaxLines="1" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>

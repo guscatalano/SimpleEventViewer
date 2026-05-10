@@ -89,3 +89,72 @@ public class LevelToTextBrushConverter : IValueConverter
         throw new NotImplementedException();
     }
 }
+
+// Returns a tinted brush for the row background when in FullRow mode, transparent in Badge mode
+public class LevelToRowBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        if (SettingsService.Instance.RowColorMode != RowColorMode.FullRow)
+        {
+            return new SolidColorBrush(Colors.Transparent);
+        }
+
+        if (value is LogLevel level)
+        {
+            var scheme = SettingsService.Instance.AccentColor;
+            var (critical, error, warning, info) = ColorSchemes.GetColors(scheme);
+
+            // Use lower alpha for row tint so text remains readable
+            byte alpha = 60;
+
+            return level switch
+            {
+                LogLevel.Critical => new SolidColorBrush(Color.FromArgb(alpha, critical.R, critical.G, critical.B)),
+                LogLevel.Error => new SolidColorBrush(Color.FromArgb(alpha, error.R, error.G, error.B)),
+                LogLevel.Warning => new SolidColorBrush(Color.FromArgb(alpha, warning.R, warning.G, warning.B)),
+                LogLevel.Information => new SolidColorBrush(Color.FromArgb(alpha, info.R, info.G, info.B)),
+                LogLevel.Verbose => new SolidColorBrush(Color.FromArgb(alpha, 158, 158, 158)),
+                _ => new SolidColorBrush(Colors.Transparent)
+            };
+        }
+        return new SolidColorBrush(Colors.Transparent);
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+// Show badge only in Badge mode, collapse in FullRow mode
+public class BadgeVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        return SettingsService.Instance.RowColorMode == RowColorMode.Badge
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+// Show plain text level only in FullRow mode (when badge is hidden)
+public class PlainLevelVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        return SettingsService.Instance.RowColorMode == RowColorMode.FullRow
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    {
+        throw new NotImplementedException();
+    }
+}

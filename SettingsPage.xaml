@@ -60,6 +60,21 @@
                         </ComboBox>
                     </Grid>
 
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Row Color Style" FontWeight="SemiBold" />
+                            <TextBlock Text="Color a small badge or tint the entire row" Opacity="0.7" FontSize="12" />
+                        </StackPanel>
+                        <ComboBox Grid.Column="1" x:Name="RowColorModeComboBox" SelectionChanged="RowColorModeComboBox_SelectionChanged" Width="200">
+                            <ComboBoxItem Content="Badge only" Tag="0" />
+                            <ComboBoxItem Content="Entire row" Tag="1" />
+                        </ComboBox>
+                    </Grid>
+
                     <!-- Preview swatches -->
                     <StackPanel Spacing="8" Margin="0,8,0,0">
                         <TextBlock Text="Color Preview" FontWeight="SemiBold" />

@@ -30,7 +30,20 @@ public sealed partial class SettingsPage : Page
             }
         }
 
+        RowColorModeComboBox.SelectedIndex = (int)SettingsService.Instance.RowColorMode;
+
         UpdateSwatches(color);
+    }
+
+    private void RowColorModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (RowColorModeComboBox.SelectedItem is ComboBoxItem item && item.Tag != null)
+        {
+            if (int.TryParse(item.Tag.ToString(), out var modeValue))
+            {
+                SettingsService.Instance.RowColorMode = (RowColorMode)modeValue;
+            }
+        }
     }
 
     private void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)

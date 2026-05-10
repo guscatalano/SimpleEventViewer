@@ -97,4 +97,23 @@ public sealed partial class MainPage : Page
     {
         Frame.Navigate(typeof(SettingsPage));
     }
+
+    private double _savedFilterWidth = 300;
+
+    private void CollapseFilters_Click(object sender, RoutedEventArgs e)
+    {
+        _savedFilterWidth = FilterColumn.Width.Value;
+        FilterColumn.Width = new GridLength(0);
+        FilterPanel.Visibility = Visibility.Collapsed;
+        FilterSplitter.Visibility = Visibility.Collapsed;
+        CollapsedFilterButton.Visibility = Visibility.Visible;
+    }
+
+    private void ExpandFilters_Click(object sender, RoutedEventArgs e)
+    {
+        FilterColumn.Width = new GridLength(_savedFilterWidth > 200 ? _savedFilterWidth : 300);
+        FilterPanel.Visibility = Visibility.Visible;
+        FilterSplitter.Visibility = Visibility.Visible;
+        CollapsedFilterButton.Visibility = Visibility.Collapsed;
+    }
 }
