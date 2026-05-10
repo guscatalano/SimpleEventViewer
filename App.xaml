@@ -11,6 +11,8 @@
             </ResourceDictionary.MergedDictionaries>
             <local:NullToVisibilityConverter x:Key="NullToVisibilityConverter" />
             <local:DateOffsetConverter x:Key="DateOffsetConverter" />
+            <local:LevelToBrushConverter x:Key="LevelToBrushConverter" />
+            <local:LevelToTextBrushConverter x:Key="LevelToTextBrushConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>
