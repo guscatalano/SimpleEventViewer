@@ -74,4 +74,9 @@ public sealed partial class MainPage : Page
         ViewModel.EndTime = null;
         ViewModel.SearchText = string.Empty;
     }
+
+    private void SettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        Frame.Navigate(typeof(SettingsPage));
+    }
 }
