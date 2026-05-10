@@ -13,6 +13,9 @@
             <local:DateOffsetConverter x:Key="DateOffsetConverter" />
             <local:LevelToBrushConverter x:Key="LevelToBrushConverter" />
             <local:LevelToTextBrushConverter x:Key="LevelToTextBrushConverter" />
+            <local:LevelToRowBrushConverter x:Key="LevelToRowBrushConverter" />
+            <local:BadgeVisibilityConverter x:Key="BadgeVisibilityConverter" />
+            <local:PlainLevelVisibilityConverter x:Key="PlainLevelVisibilityConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

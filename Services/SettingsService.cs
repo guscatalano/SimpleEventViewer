@@ -10,6 +10,12 @@ public enum AppTheme
     Dark = 2
 }
 
+public enum RowColorMode
+{
+    Badge = 0,
+    FullRow = 1
+}
+
 public class SettingsService
 {
     private static readonly Lazy<SettingsService> _instance = new(() => new SettingsService());
@@ -17,10 +23,38 @@ public class SettingsService
 
     private const string ThemeKey = "AppTheme";
     private const string AccentColorKey = "AccentColor";
+    private const string RowColorModeKey = "RowColorMode";
 
     public event Action? ThemeChanged;
 
     private SettingsService() { }
+
+    public RowColorMode RowColorMode
+    {
+        get
+        {
+            try
+            {
+                var localSettings = ApplicationData.Current.LocalSettings;
+                if (localSettings.Values[RowColorModeKey] is int modeValue)
+                {
+                    return (RowColorMode)modeValue;
+                }
+            }
+            catch { }
+            return RowColorMode.Badge;
+        }
+        set
+        {
+            try
+            {
+                var localSettings = ApplicationData.Current.LocalSettings;
+                localSettings.Values[RowColorModeKey] = (int)value;
+            }
+            catch { }
+            ThemeChanged?.Invoke();
+        }
+    }
 
     public AppTheme Theme
     {

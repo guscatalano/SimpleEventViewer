@@ -41,10 +41,10 @@ public partial class MainViewModel : ObservableObject
         {
             if (count % 100 == 0 || count == _totalEventCount)
             {
-                var total = _totalEventCount > 0 ? _totalEventCount.ToString() : "?";
+                var total = _totalEventCount > 0 ? _totalEventCount.ToString() : "counting...";
                 _dispatcherQueue.TryEnqueue(() =>
                 {
-                    StatusMessage = $"Loading system logs... ({count}/{total} events)";
+                    StatusMessage = $"Loading system logs... ({count}/{total})";
                 });
             }
         };
@@ -171,10 +171,21 @@ public partial class MainViewModel : ObservableObject
         SourceCategories.Clear();
         SourceCategories.Add(new SourceCategory { Name = "All Sources", Count = 0, IsAllSources = true });
         SelectedSource = SourceCategories[0];
-        _totalEventCount = -1; // unknown - we'll stream instead
+        _totalEventCount = -1;
 
         try
         {
+            // Kick off count in parallel - results update progress display once known
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    var count = EventLogService.Instance.CountSystemEvents();
+                    _totalEventCount = count;
+                }
+                catch { }
+            });
+
             // Enable streaming - events will flow in via OnEventBatchLoaded as they load
             _isStreaming = true;
 
