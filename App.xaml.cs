@@ -40,5 +40,9 @@ public partial class App : Application
     {
         MainWindow = new MainWindow();
         MainWindow.Activate();
+
+        // Apply saved theme
+        SimpleEventViewer_WinUI.Services.SettingsService.Instance.ApplyTheme(
+            SimpleEventViewer_WinUI.Services.SettingsService.Instance.Theme);
     }
 }

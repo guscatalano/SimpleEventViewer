@@ -17,13 +17,23 @@
         </Grid.RowDefinitions>
 
         <!-- Top: Toolbar -->
-        <CommandBar Grid.Row="0" DefaultLabelPosition="Right" HorizontalAlignment="Left" Background="Transparent">
-            <AppBarButton Icon="Refresh" Label="Refresh" Click="RefreshButton_Click" />
-            <AppBarSeparator />
-            <AppBarButton Icon="OpenFile" Label="Load EVTX" Click="LoadEvtxFile_Click" />
-            <AppBarButton Icon="OpenFile" Label="Load XML" Click="LoadXmlFile_Click" />
-            <AppBarButton Icon="OpenFile" Label="Load ETL" Click="LoadEtlFile_Click" />
-        </CommandBar>
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <CommandBar Grid.Column="0" DefaultLabelPosition="Right" HorizontalAlignment="Left" Background="Transparent">
+                <AppBarButton Icon="Refresh" Label="Refresh" Click="RefreshButton_Click" />
+                <AppBarSeparator />
+                <AppBarButton Icon="OpenFile" Label="Load EVTX" Click="LoadEvtxFile_Click" />
+                <AppBarButton Icon="OpenFile" Label="Load XML" Click="LoadXmlFile_Click" />
+                <AppBarButton Icon="OpenFile" Label="Load ETL" Click="LoadEtlFile_Click" />
+            </CommandBar>
+            <Button Grid.Column="1" Click="SettingsButton_Click" Padding="8" VerticalAlignment="Center" Margin="0,0,8,0"
+                    ToolTipService.ToolTip="Settings">
+                <FontIcon Glyph="&#xE713;" FontSize="16" />
+            </Button>
+        </Grid>
 
         <!-- Main content -->
         <Grid Grid.Row="1" ColumnSpacing="8">
