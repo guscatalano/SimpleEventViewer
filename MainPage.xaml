@@ -142,11 +142,17 @@
                                             <ColumnDefinition Width="180" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Bind TimeCreatedDisplay}" />
-                                        <TextBlock Grid.Column="1" Text="{x:Bind LevelName}" />
-                                        <TextBlock Grid.Column="2" Text="{x:Bind Id}" />
-                                        <TextBlock Grid.Column="3" Text="{x:Bind ProviderName}" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Grid.Column="4" Text="{x:Bind Message}" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                        <TextBlock Grid.Column="0" Text="{x:Bind TimeCreatedDisplay}" VerticalAlignment="Center" />
+                                        <Border Grid.Column="1" CornerRadius="4" Padding="6,2" Margin="0,0,8,0"
+                                                HorizontalAlignment="Left"
+                                                Background="{x:Bind Level, Converter={StaticResource LevelToBrushConverter}}">
+                                            <TextBlock Text="{x:Bind LevelName}"
+                                                       Foreground="{x:Bind Level, Converter={StaticResource LevelToTextBrushConverter}}"
+                                                       FontSize="11" FontWeight="SemiBold" />
+                                        </Border>
+                                        <TextBlock Grid.Column="2" Text="{x:Bind Id}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="3" Text="{x:Bind ProviderName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="4" Text="{x:Bind Message}" TextTrimming="CharacterEllipsis" MaxLines="1" VerticalAlignment="Center" />
                                     </Grid>
                                 </DataTemplate>
                             </ListView.ItemTemplate>

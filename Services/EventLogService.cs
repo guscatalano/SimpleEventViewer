@@ -20,6 +20,8 @@ public class EventLogService
     private EventLogService() { }
 
     public event Action<int>? OnEventsLoaded;
+    public event Action<List<EventLogEntry>>? OnEventBatchLoaded;
+    public event Action? OnLoadComplete;
 
     public int CountSystemEvents()
     {
@@ -49,6 +51,9 @@ public class EventLogService
 
         using var reader = new EventLogReader(query);
 
+        const int batchSize = 100;
+        var batch = new List<EventLogEntry>(batchSize);
+
         while (true)
         {
             var entry = reader.ReadEvent();
@@ -58,12 +63,27 @@ public class EventLogService
             if (logEntry != null)
             {
                 _events.Add(logEntry);
+                batch.Add(logEntry);
                 var source = logEntry.ProviderName;
                 _sourceCounts.AddOrUpdate(source, 1, (key, count) => count + 1);
+
+                if (batch.Count >= batchSize)
+                {
+                    OnEventBatchLoaded?.Invoke(batch);
+                    batch = new List<EventLogEntry>(batchSize);
+                }
             }
 
             OnEventsLoaded?.Invoke(_events.Count);
         }
+
+        // Flush any remaining events in the partial batch
+        if (batch.Count > 0)
+        {
+            OnEventBatchLoaded?.Invoke(batch);
+        }
+
+        OnLoadComplete?.Invoke();
     }
 
     public void LoadEtlFile(string filePath)

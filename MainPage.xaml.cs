@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using SimpleEventViewer_WinUI.Services;
 using SimpleEventViewer_WinUI.ViewModels;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
@@ -14,6 +15,23 @@ public sealed partial class MainPage : Page
     {
         ViewModel = new MainViewModel();
         InitializeComponent();
+
+        // Refresh row colors when theme/color scheme changes
+        SettingsService.Instance.ThemeChanged += OnThemeChanged;
+    }
+
+    private void OnThemeChanged()
+    {
+        // Force ListView to re-render items by triggering a refresh of the ItemsSource
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            var temp = ViewModel.FilteredEvents.ToList();
+            ViewModel.FilteredEvents.Clear();
+            foreach (var item in temp)
+            {
+                ViewModel.FilteredEvents.Add(item);
+            }
+        });
     }
 
     private void RefreshButton_Click(object sender, RoutedEventArgs e)

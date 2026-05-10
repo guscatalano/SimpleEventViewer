@@ -21,6 +21,7 @@ public partial class MainViewModel : ObservableObject
     private ObservableCollection<SourceCategory> _sourceCategories = new();
     private ObservableCollection<EventLogEntry> _filteredEvents = new();
     private int _totalEventCount = -1;
+    private bool _isStreaming = false;
 
     public MainViewModel()
     {
@@ -46,6 +47,32 @@ public partial class MainViewModel : ObservableObject
                     StatusMessage = $"Loading system logs... ({count}/{total} events)";
                 });
             }
+        };
+
+        EventLogService.Instance.OnEventBatchLoaded += batch =>
+        {
+            if (!_isStreaming) return;
+
+            // Capture batch on background thread then marshal to UI thread
+            var batchCopy = batch.ToList();
+            _dispatcherQueue.TryEnqueue(() =>
+            {
+                if (!_isStreaming) return;
+
+                // Apply filters to the batch and add matching entries
+                foreach (var entry in batchCopy)
+                {
+                    if (MatchesFilters(entry))
+                    {
+                        InsertSorted(entry);
+                    }
+                }
+            });
+        };
+
+        EventLogService.Instance.OnLoadComplete += () =>
+        {
+            _isStreaming = false;
         };
 
         _ = LoadSystemLogsAsync();
@@ -139,28 +166,30 @@ public partial class MainViewModel : ObservableObject
 
     private async Task LoadSystemLogsAsync()
     {
-        StatusMessage = "Counting events...";
+        StatusMessage = "Loading system logs...";
+        FilteredEvents.Clear();
+        SourceCategories.Clear();
+        SourceCategories.Add(new SourceCategory { Name = "All Sources", Count = 0, IsAllSources = true });
+        SelectedSource = SourceCategories[0];
+        _totalEventCount = -1; // unknown - we'll stream instead
 
         try
         {
-            _totalEventCount = await Task.Run(() => EventLogService.Instance.CountSystemEvents());
-
-            _dispatcherQueue.TryEnqueue(() =>
-            {
-                StatusMessage = $"Counting events... ({_totalEventCount} total)";
-            });
+            // Enable streaming - events will flow in via OnEventBatchLoaded as they load
+            _isStreaming = true;
 
             await Task.Run(() => EventLogService.Instance.LoadCurrentSystemLogs());
 
             _dispatcherQueue.TryEnqueue(() =>
             {
+                _isStreaming = false;
                 UpdateSourceCategories();
-                ApplyFilters();
                 StatusMessage = $"Loaded {EventLogService.Instance.Events.Count} events from system";
             });
         }
         catch (Exception ex)
         {
+            _isStreaming = false;
             _dispatcherQueue.TryEnqueue(() =>
             {
                 StatusMessage = $"Error: {ex.Message}";
@@ -170,6 +199,9 @@ public partial class MainViewModel : ObservableObject
 
     private void UpdateSourceCategories()
     {
+        // Preserve current selection
+        var currentSelectionName = SelectedSource?.Name;
+
         SourceCategories.Clear();
         SourceCategories.Add(new SourceCategory { Name = "All Sources", Count = EventLogService.Instance.Events.Count, IsAllSources = true });
 
@@ -179,30 +211,101 @@ public partial class MainViewModel : ObservableObject
             SourceCategories.Add(new SourceCategory { Name = source, Count = count, IsAllSources = false });
         }
 
-        if (SourceCategories.Count > 0 && SelectedSource == null)
+        // Restore selection by name
+        if (!string.IsNullOrEmpty(currentSelectionName))
+        {
+            var match = SourceCategories.FirstOrDefault(c => c.Name == currentSelectionName);
+            if (match != null)
+            {
+                SelectedSource = match;
+            }
+            else
+            {
+                SelectedSource = SourceCategories[0];
+            }
+        }
+        else if (SourceCategories.Count > 0)
         {
             SelectedSource = SourceCategories[0];
         }
     }
 
-    public void ApplyFilters()
+    private bool MatchesFilters(EventLogEntry entry)
     {
         var startTime = StartTime?.DateTime ?? DateTime.MinValue;
         var endTime = EndTime?.DateTime ?? DateTime.MaxValue;
-
         var sourceName = SelectedSource == null || SelectedSource.IsAllSources ? null : SelectedSource.Name;
 
-        var filtered = EventLogService.Instance.FilterEvents(
-            sourceName,
+        return (string.IsNullOrEmpty(sourceName) || entry.ProviderName == sourceName) &&
+               (SelectedType?.Level == null || entry.Level == SelectedType.Level.Value) &&
+               (entry.TimeCreated >= startTime) &&
+               (entry.TimeCreated <= endTime) &&
+               (string.IsNullOrEmpty(SearchText) || entry.Message.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void InsertSorted(EventLogEntry entry)
+    {
+        // Most recent events first - binary search for insertion point
+        int low = 0;
+        int high = FilteredEvents.Count;
+        while (low < high)
+        {
+            int mid = (low + high) / 2;
+            if (FilteredEvents[mid].TimeCreated > entry.TimeCreated)
+            {
+                low = mid + 1;
+            }
+            else
+            {
+                high = mid;
+            }
+        }
+        FilteredEvents.Insert(low, entry);
+    }
+
+    public void ApplyFilters()
+    {
+        // If we're currently streaming, don't do the full filter rebuild - the stream handler does it incrementally
+        if (_isStreaming)
+        {
+            // For streaming, rebuild from scratch but only with the events already loaded
+            FilteredEvents.Clear();
+            var startTime = StartTime?.DateTime ?? DateTime.MinValue;
+            var endTime = EndTime?.DateTime ?? DateTime.MaxValue;
+            var sourceName = SelectedSource == null || SelectedSource.IsAllSources ? null : SelectedSource.Name;
+
+            var filtered = EventLogService.Instance.FilterEvents(
+                sourceName,
+                SelectedType?.Level,
+                startTime,
+                endTime,
+                null,
+                SearchText
+            );
+
+            foreach (var entry in filtered)
+            {
+                FilteredEvents.Add(entry);
+            }
+            return;
+        }
+
+        var startTime2 = StartTime?.DateTime ?? DateTime.MinValue;
+        var endTime2 = EndTime?.DateTime ?? DateTime.MaxValue;
+
+        var sourceName2 = SelectedSource == null || SelectedSource.IsAllSources ? null : SelectedSource.Name;
+
+        var filteredFinal = EventLogService.Instance.FilterEvents(
+            sourceName2,
             SelectedType?.Level,
-            startTime,
-            endTime,
+            startTime2,
+            endTime2,
             null,
             SearchText
         );
 
         FilteredEvents.Clear();
-        foreach (var entry in filtered)
+        foreach (var entry in filteredFinal)
         {
             FilteredEvents.Add(entry);
         }
