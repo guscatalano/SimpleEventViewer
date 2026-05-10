@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "SimpleEventViewer.WinUI (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "SimpleEventViewer.WinUI (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
