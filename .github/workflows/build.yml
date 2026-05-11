@@ -8,6 +8,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -101,3 +104,21 @@ jobs:
             artifacts/*.msixbundle
             artifacts/*.msi
           generate_release_notes: true
+
+      - name: Update rolling 'latest' release on main
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Latest build"
+          body: |
+            Auto-generated rolling build from `main`.
+            Commit: ${{ github.sha }}
+
+            > For versioned releases, push a `v*` tag (e.g. `v1.0.0`).
+          prerelease: true
+          make_latest: false
+          files: |
+            artifacts/*.msix
+            artifacts/*.msixbundle
+            artifacts/*.msi
