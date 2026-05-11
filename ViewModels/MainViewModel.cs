@@ -17,7 +17,7 @@ public partial class MainViewModel : ObservableObject
 
     private string _statusMessage = "Ready";
     private SourceCategory? _selectedSource;
-    private EventTypeItem? _selectedType;
+    private EventTypeItem _selectedType = null!;
     private DateTimeOffset? _startTime;
     private DateTimeOffset? _endTime;
     private TimeSpan _startTimeOfDay = TimeSpan.Zero;
@@ -30,6 +30,10 @@ public partial class MainViewModel : ObservableObject
     private bool _isStreaming = false;
     private LoadWindowItem _selectedLoadWindow;
     private bool _isFileSource = false;
+    // The earliest time covered by the currently loaded events (DateTime.MinValue means "all time")
+    private DateTime _loadedSinceTime = DateTime.MinValue;
+    // Whether we currently have any data loaded
+    private bool _hasLoadedData = false;
 
     public MainViewModel()
     {
@@ -44,6 +48,7 @@ public partial class MainViewModel : ObservableObject
             new() { Level = LogLevel.Information, Name = "Information" },
             new() { Level = LogLevel.Verbose, Name = "Verbose" }
         };
+        _selectedType = AvailableTypes[0]; // default to All Levels
 
         LoadWindows = new List<LoadWindowItem>
         {
@@ -142,7 +147,7 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    public EventTypeItem? SelectedType
+    public EventTypeItem SelectedType
     {
         get => _selectedType;
         set
@@ -205,10 +210,24 @@ public partial class MainViewModel : ObservableObject
     private void OnTimeRangeChanged()
     {
         // For file sources, never reload - just filter the existing data.
-        // For live system logs in Custom mode, reload with the new range.
-        if (!_isFileSource && _selectedLoadWindow.IsCustom)
+        if (_isFileSource)
         {
-            _ = LoadSystemLogsAsync();
+            ApplyFilters();
+            return;
+        }
+
+        // For live system logs in Custom mode, reload only if the new start extends earlier than loaded.
+        if (_selectedLoadWindow.IsCustom && _hasLoadedData)
+        {
+            var newRangeStart = GetRequestedRangeStart();
+            if (newRangeStart < _loadedSinceTime)
+            {
+                _ = LoadSystemLogsAsync();
+            }
+            else
+            {
+                ApplyFilters();
+            }
         }
         else
         {
@@ -245,18 +264,49 @@ public partial class MainViewModel : ObservableObject
             if (SetProperty(ref _selectedLoadWindow, value))
             {
                 OnPropertyChanged(nameof(IsCustomRange));
-                // For live system logs, changing the preset reloads from source.
-                // For file sources, the file is already loaded - just filter the display.
+
+                // File sources never reload from the live system - filter only.
                 if (_isFileSource)
                 {
+                    ApplyFilters();
+                    return;
+                }
+
+                // If we don't have data yet, load it.
+                if (!_hasLoadedData)
+                {
+                    _ = LoadSystemLogsAsync();
+                    return;
+                }
+
+                // Decide: does the new range fit within what's already loaded?
+                var newRangeStart = GetRequestedRangeStart();
+                if (newRangeStart >= _loadedSinceTime)
+                {
+                    // New range is a subset of loaded data - just filter
                     ApplyFilters();
                 }
                 else
                 {
+                    // New range extends earlier than loaded data - need to reload
                     _ = LoadSystemLogsAsync();
                 }
             }
         }
+    }
+
+    private DateTime GetRequestedRangeStart()
+    {
+        if (_selectedLoadWindow.IsCustom)
+        {
+            if (!StartTime.HasValue) return DateTime.MinValue;
+            return StartTime.Value.Date + StartTimeOfDay;
+        }
+        if (_selectedLoadWindow.Lookback.HasValue)
+        {
+            return DateTime.Now - _selectedLoadWindow.Lookback.Value;
+        }
+        return DateTime.MinValue;
     }
 
     public Visibility IsCustomRange => _selectedLoadWindow.IsCustom ? Visibility.Visible : Visibility.Collapsed;
@@ -285,6 +335,15 @@ public partial class MainViewModel : ObservableObject
                 if (StartTime.HasValue) customStart = StartTime.Value.Date + StartTimeOfDay;
                 if (EndTime.HasValue) customEnd = EndTime.Value.Date + EndTimeOfDay;
                 lookback = null;
+                _loadedSinceTime = customStart ?? DateTime.MinValue;
+            }
+            else if (lookback.HasValue)
+            {
+                _loadedSinceTime = DateTime.Now - lookback.Value;
+            }
+            else
+            {
+                _loadedSinceTime = DateTime.MinValue; // "All time"
             }
 
             // Kick off count in parallel
@@ -315,6 +374,7 @@ public partial class MainViewModel : ObservableObject
 
                 _isStreaming = false;
                 _flushTimer?.Stop();
+                _hasLoadedData = true;
                 UpdateSourceCategories();
                 StatusMessage = $"Loaded {EventLogService.Instance.Events.Count} events from system";
             });
