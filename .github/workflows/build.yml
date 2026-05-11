@@ -1,0 +1,100 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    env:
+      Configuration: Release
+      Platform: x64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+
+      - name: Resolve app version
+        shell: pwsh
+        run: |
+          $raw = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "1.0.0" }
+          $v = $raw.TrimStart('v')
+          # MSI versions must be like Major.Minor.Build (1-3 numeric components)
+          if ($v -notmatch '^\d+\.\d+(\.\d+)?$') { $v = '1.0.0' }
+          echo "AppVersion=$v" >> $env:GITHUB_ENV
+          echo "App version: $v"
+
+      - name: Restore
+        run: msbuild SimpleEventViewer.WinUI.csproj /t:Restore /p:Configuration=$env:Configuration /p:Platform=$env:Platform
+
+      - name: Build MSIX
+        run: |
+          msbuild SimpleEventViewer.WinUI.csproj `
+            /p:Configuration=$env:Configuration `
+            /p:Platform=$env:Platform `
+            /p:GenerateAppxPackageOnBuild=true `
+            /p:AppxPackageSigningEnabled=false `
+            /p:UapAppxPackageBuildMode=SideloadOnly `
+            /p:AppxBundle=Never
+
+      - name: Publish for MSI
+        run: |
+          dotnet publish SimpleEventViewer.WinUI.csproj `
+            -c $env:Configuration `
+            -p:Platform=$env:Platform `
+            -r win-x64 `
+            --self-contained true `
+            -o publish
+
+      - name: Install WiX
+        run: dotnet tool install --global wix
+
+      - name: Build MSI
+        run: wix build installer.wxs -arch x64 -d AppVersion=${{ env.AppVersion }} -out SimpleEventViewer.msi
+
+      - name: Collect artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          Get-ChildItem -Path AppPackages -Recurse -Include *.msix,*.msixbundle -ErrorAction SilentlyContinue | Copy-Item -Destination artifacts -Force
+          if (Test-Path SimpleEventViewer.msi) { Copy-Item SimpleEventViewer.msi artifacts -Force }
+          Get-ChildItem artifacts
+
+      - name: Upload MSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: SimpleEventViewer-msix
+          path: artifacts/*.msix*
+          if-no-files-found: warn
+
+      - name: Upload MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: SimpleEventViewer-msi
+          path: artifacts/*.msi
+          if-no-files-found: warn
+
+      - name: Create release on tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*.msix
+            artifacts/*.msixbundle
+            artifacts/*.msi
+          generate_release_notes: true
