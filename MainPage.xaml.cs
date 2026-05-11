@@ -5,6 +5,9 @@ using Microsoft.UI.Xaml.Media;
 using SimpleEventViewer_WinUI.Models;
 using SimpleEventViewer_WinUI.Services;
 using SimpleEventViewer_WinUI.ViewModels;
+using System.Linq;
+using System.Text;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
 
@@ -153,5 +156,113 @@ public sealed partial class MainPage : Page
             var brush = _rowBrushConverter.Convert(entry.Level, typeof(Brush), null, "") as Brush;
             e.Row.Background = brush ?? _transparentBrush;
         }
+    }
+
+    private IEnumerable<EventLogEntry> GetSelectedEntries()
+    {
+        return EventsDataGrid.SelectedItems.OfType<EventLogEntry>();
+    }
+
+    private void CopyRows_Click(object sender, RoutedEventArgs e)
+    {
+        var entries = GetSelectedEntries().ToList();
+        if (entries.Count == 0) return;
+
+        var sb = new StringBuilder();
+        foreach (var entry in entries)
+        {
+            sb.Append(entry.TimeCreatedDisplay).Append('\t');
+            sb.Append(entry.LevelName).Append('\t');
+            sb.Append(entry.Id).Append('\t');
+            sb.Append(entry.ProviderName).Append('\t');
+            sb.Append(entry.Username).Append('\t');
+            sb.AppendLine(entry.Message.Replace('\n', ' ').Replace('\r', ' '));
+        }
+        SetClipboard(sb.ToString());
+    }
+
+    private void CopyRowsAsCsv_Click(object sender, RoutedEventArgs e)
+    {
+        var entries = GetSelectedEntries().ToList();
+        if (entries.Count == 0) return;
+
+        var sb = new StringBuilder();
+        sb.AppendLine("Time,Level,ID,Source,User,Message");
+        foreach (var entry in entries)
+        {
+            sb.Append(CsvEscape(entry.TimeCreatedDisplay)).Append(',');
+            sb.Append(CsvEscape(entry.LevelName)).Append(',');
+            sb.Append(entry.Id).Append(',');
+            sb.Append(CsvEscape(entry.ProviderName)).Append(',');
+            sb.Append(CsvEscape(entry.Username)).Append(',');
+            sb.AppendLine(CsvEscape(entry.Message));
+        }
+        SetClipboard(sb.ToString());
+    }
+
+    private void CopyMessage_Click(object sender, RoutedEventArgs e)
+    {
+        var entries = GetSelectedEntries().ToList();
+        if (entries.Count == 0) return;
+        var text = string.Join(Environment.NewLine + Environment.NewLine,
+            entries.Select(en => en.Message));
+        SetClipboard(text);
+    }
+
+    private void SelectAllRows_Click(object sender, RoutedEventArgs e)
+    {
+        EventsDataGrid.SelectedItems.Clear();
+        foreach (var item in ViewModel.FilteredEvents)
+        {
+            EventsDataGrid.SelectedItems.Add(item);
+        }
+    }
+
+    private static string CsvEscape(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return "";
+        if (value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r'))
+        {
+            return "\"" + value.Replace("\"", "\"\"") + "\"";
+        }
+        return value;
+    }
+
+    private static void SetClipboard(string text)
+    {
+        var dp = new DataPackage();
+        dp.SetText(text);
+        Clipboard.SetContent(dp);
+    }
+
+    private void CopyDetailField_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.Tag is string text)
+        {
+            SetClipboard(text);
+        }
+    }
+
+    private void CopyAllDetails_Click(object sender, RoutedEventArgs e)
+    {
+        var entry = ViewModel.SelectedEvent;
+        if (entry == null) return;
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"Event ID: {entry.Id}");
+        sb.AppendLine($"Level: {entry.LevelName}");
+        sb.AppendLine($"Time Created: {entry.TimeCreatedDisplay}");
+        sb.AppendLine($"Provider: {entry.ProviderName}");
+        sb.AppendLine($"Task: {entry.TaskName}");
+        sb.AppendLine($"Keywords: {entry.Keywords}");
+        sb.AppendLine($"User: {entry.Username}");
+        sb.AppendLine($"Process ID: {entry.ProcessId}");
+        sb.AppendLine($"Thread ID: {entry.ThreadId}");
+        sb.AppendLine($"Computer: {entry.Computer}");
+        sb.AppendLine();
+        sb.AppendLine("Message:");
+        sb.AppendLine(entry.Message);
+
+        SetClipboard(sb.ToString());
     }
 }
