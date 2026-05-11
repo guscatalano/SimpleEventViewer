@@ -86,14 +86,24 @@
 
                             <StackPanel Spacing="6">
                                 <TextBlock Text="Time Range" FontWeight="SemiBold" FontSize="13" />
+                                <TextBlock Text="From" Opacity="0.7" FontSize="11" />
                                 <CalendarDatePicker x:Name="StartDatePicker"
-                                                    PlaceholderText="From"
+                                                    PlaceholderText="Date"
                                                     Date="{x:Bind ViewModel.StartTime, Mode=TwoWay, Converter={StaticResource DateOffsetConverter}}"
                                                     HorizontalAlignment="Stretch" />
+                                <TimePicker x:Name="StartTimePicker"
+                                            ClockIdentifier="24HourClock"
+                                            SelectedTime="{x:Bind ViewModel.StartTimeOfDay, Mode=TwoWay, Converter={StaticResource TimeSpanConverter}}"
+                                            HorizontalAlignment="Stretch" />
+                                <TextBlock Text="To" Opacity="0.7" FontSize="11" Margin="0,4,0,0" />
                                 <CalendarDatePicker x:Name="EndDatePicker"
-                                                    PlaceholderText="To"
+                                                    PlaceholderText="Date"
                                                     Date="{x:Bind ViewModel.EndTime, Mode=TwoWay, Converter={StaticResource DateOffsetConverter}}"
                                                     HorizontalAlignment="Stretch" />
+                                <TimePicker x:Name="EndTimePicker"
+                                            ClockIdentifier="24HourClock"
+                                            SelectedTime="{x:Bind ViewModel.EndTimeOfDay, Mode=TwoWay, Converter={StaticResource TimeSpanConverter}}"
+                                            HorizontalAlignment="Stretch" />
                             </StackPanel>
 
                             <StackPanel Spacing="6">

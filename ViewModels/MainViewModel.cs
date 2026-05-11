@@ -16,6 +16,8 @@ public partial class MainViewModel : ObservableObject
     private EventTypeItem? _selectedType;
     private DateTimeOffset? _startTime;
     private DateTimeOffset? _endTime;
+    private TimeSpan _startTimeOfDay = TimeSpan.Zero;
+    private TimeSpan _endTimeOfDay = new TimeSpan(23, 59, 59);
     private string _searchText = string.Empty;
     private EventLogEntry? _selectedEvent;
     private ObservableCollection<SourceCategory> _sourceCategories = new();
@@ -144,6 +146,30 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    public TimeSpan StartTimeOfDay
+    {
+        get => _startTimeOfDay;
+        set
+        {
+            if (SetProperty(ref _startTimeOfDay, value))
+            {
+                ApplyFilters();
+            }
+        }
+    }
+
+    public TimeSpan EndTimeOfDay
+    {
+        get => _endTimeOfDay;
+        set
+        {
+            if (SetProperty(ref _endTimeOfDay, value))
+            {
+                ApplyFilters();
+            }
+        }
+    }
+
     public string SearchText
     {
         get => _searchText;
@@ -241,10 +267,22 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    private DateTime GetEffectiveStartTime()
+    {
+        if (!StartTime.HasValue) return DateTime.MinValue;
+        return StartTime.Value.Date + StartTimeOfDay;
+    }
+
+    private DateTime GetEffectiveEndTime()
+    {
+        if (!EndTime.HasValue) return DateTime.MaxValue;
+        return EndTime.Value.Date + EndTimeOfDay;
+    }
+
     private bool MatchesFilters(EventLogEntry entry)
     {
-        var startTime = StartTime?.DateTime ?? DateTime.MinValue;
-        var endTime = EndTime?.DateTime ?? DateTime.MaxValue;
+        var startTime = GetEffectiveStartTime();
+        var endTime = GetEffectiveEndTime();
         var sourceName = SelectedSource == null || SelectedSource.IsAllSources ? null : SelectedSource.Name;
 
         return (string.IsNullOrEmpty(sourceName) || entry.ProviderName == sourceName) &&
@@ -276,47 +314,21 @@ public partial class MainViewModel : ObservableObject
 
     public void ApplyFilters()
     {
-        // If we're currently streaming, don't do the full filter rebuild - the stream handler does it incrementally
-        if (_isStreaming)
-        {
-            // For streaming, rebuild from scratch but only with the events already loaded
-            FilteredEvents.Clear();
-            var startTime = StartTime?.DateTime ?? DateTime.MinValue;
-            var endTime = EndTime?.DateTime ?? DateTime.MaxValue;
-            var sourceName = SelectedSource == null || SelectedSource.IsAllSources ? null : SelectedSource.Name;
+        var startTime = GetEffectiveStartTime();
+        var endTime = GetEffectiveEndTime();
+        var sourceName = SelectedSource == null || SelectedSource.IsAllSources ? null : SelectedSource.Name;
 
-            var filtered = EventLogService.Instance.FilterEvents(
-                sourceName,
-                SelectedType?.Level,
-                startTime,
-                endTime,
-                null,
-                SearchText
-            );
-
-            foreach (var entry in filtered)
-            {
-                FilteredEvents.Add(entry);
-            }
-            return;
-        }
-
-        var startTime2 = StartTime?.DateTime ?? DateTime.MinValue;
-        var endTime2 = EndTime?.DateTime ?? DateTime.MaxValue;
-
-        var sourceName2 = SelectedSource == null || SelectedSource.IsAllSources ? null : SelectedSource.Name;
-
-        var filteredFinal = EventLogService.Instance.FilterEvents(
-            sourceName2,
+        var filtered = EventLogService.Instance.FilterEvents(
+            sourceName,
             SelectedType?.Level,
-            startTime2,
-            endTime2,
+            startTime,
+            endTime,
             null,
             SearchText
         );
 
         FilteredEvents.Clear();
-        foreach (var entry in filteredFinal)
+        foreach (var entry in filtered)
         {
             FilteredEvents.Add(entry);
         }

@@ -90,6 +90,8 @@ public sealed partial class MainPage : Page
         ViewModel.SelectedType = null;
         ViewModel.StartTime = null;
         ViewModel.EndTime = null;
+        ViewModel.StartTimeOfDay = TimeSpan.Zero;
+        ViewModel.EndTimeOfDay = new TimeSpan(23, 59, 59);
         ViewModel.SearchText = string.Empty;
     }
 
