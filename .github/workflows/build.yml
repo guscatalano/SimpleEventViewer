@@ -65,7 +65,7 @@ jobs:
             -o publish
 
       - name: Install WiX
-        run: dotnet tool install --global wix
+        run: dotnet tool install --global wix --version 5.0.2
 
       - name: Build MSI
         run: wix build installer.wxs -arch x64 -d AppVersion=${{ env.AppVersion }} -out SimpleEventViewer.msi
