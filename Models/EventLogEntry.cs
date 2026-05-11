@@ -8,6 +8,7 @@ public class EventLogEntry
     public DateTime TimeCreated { get; set; }
     public string TimeCreatedDisplay => TimeCreated.ToString("yyyy-MM-dd HH:mm:ss");
     public string ProviderName { get; set; } = string.Empty;
+    public string ProviderGuid { get; set; } = string.Empty;
     public string TaskName { get; set; } = string.Empty;
     public string Keywords { get; set; } = string.Empty;
     public string Username { get; set; } = string.Empty;

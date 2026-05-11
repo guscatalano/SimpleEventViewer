@@ -379,6 +379,29 @@ public sealed partial class MainPage : Page
         SetClipboard($"{entry.ProcessId} / {entry.ThreadId}");
     }
 
+    private void ColumnsButton_Click(object sender, RoutedEventArgs e)
+    {
+        var flyout = new MenuFlyout();
+        foreach (var col in EventsDataGrid.Columns)
+        {
+            var item = new ToggleMenuFlyoutItem
+            {
+                Text = col.Header?.ToString() ?? col.Tag?.ToString() ?? "Column",
+                IsChecked = col.Visibility == Visibility.Visible
+            };
+            var capturedCol = col;
+            item.Click += (s, args) =>
+            {
+                capturedCol.Visibility = ((ToggleMenuFlyoutItem)s).IsChecked ? Visibility.Visible : Visibility.Collapsed;
+            };
+            flyout.Items.Add(item);
+        }
+        if (sender is FrameworkElement fe)
+        {
+            flyout.ShowAt(fe);
+        }
+    }
+
     private void CopyAllDetails_Click(object sender, RoutedEventArgs e)
     {
         var entry = ViewModel.SelectedEvent;

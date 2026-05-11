@@ -322,6 +322,7 @@ public class EventLogService
                 Level = level,
                 TimeCreated = record.TimeCreated ?? DateTime.Now,
                 ProviderName = record.ProviderName ?? "Unknown",
+                ProviderGuid = record.ProviderId?.ToString() ?? string.Empty,
                 TaskName = record.TaskDisplayName ?? string.Empty,
                 Keywords = keywords,
                 Username = username,
@@ -405,7 +406,9 @@ public class EventLogService
             var level = levelNode != null && int.TryParse(levelNode.InnerText, out var levelVal) ? (LogLevel)levelVal : LogLevel.Information;
             var timeNode = node.SelectSingleNode("System/TimeCreated");
             var time = timeNode?.Attributes["SystemTime"]?.Value;
-            var provider = node.SelectSingleNode("System/Provider")?.Attributes["Name"]?.Value ?? "Unknown";
+            var providerNode = node.SelectSingleNode("System/Provider");
+            var provider = providerNode?.Attributes["Name"]?.Value ?? "Unknown";
+            var providerGuid = providerNode?.Attributes["Guid"]?.Value ?? string.Empty;
             var task = node.SelectSingleNode("System/Task")?.InnerText ?? string.Empty;
             var keywords = node.SelectSingleNode("System/Keywords")?.InnerText ?? string.Empty;
             var userNode = node.SelectSingleNode("System/Security")?.Attributes["UserID"]?.Value;
@@ -420,6 +423,7 @@ public class EventLogService
                 Level = level,
                 TimeCreated = DateTime.TryParse(time, out var dt) ? dt : DateTime.Now,
                 ProviderName = provider,
+                ProviderGuid = providerGuid,
                 TaskName = task,
                 Keywords = keywords,
                 Username = username,
