@@ -90,7 +90,10 @@ public sealed partial class MainPage : Page
     private void ClearFilters_Click(object sender, RoutedEventArgs e)
     {
         ViewModel.SelectedSource = ViewModel.SourceCategories.Count > 0 ? ViewModel.SourceCategories[0] : null;
-        ViewModel.SelectedType = null;
+        if (ViewModel.AvailableTypes.Count > 0)
+        {
+            ViewModel.SelectedType = ViewModel.AvailableTypes[0];
+        }
         ViewModel.StartTime = null;
         ViewModel.EndTime = null;
         ViewModel.StartTimeOfDay = TimeSpan.Zero;
