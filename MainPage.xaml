@@ -163,17 +163,35 @@
                                           CanUserReorderColumns="True"
                                           GridLinesVisibility="Horizontal"
                                           HeadersVisibility="Column"
-                                          SelectionMode="Single"
+                                          SelectionMode="Extended"
                                           IsReadOnly="True"
                                           RowBackground="Transparent"
+                                          RowHeight="32"
                                           LoadingRow="EventsDataGrid_LoadingRow">
+                        <tkcontrols:DataGrid.ContextFlyout>
+                            <MenuFlyout>
+                                <MenuFlyoutItem Text="Copy" Click="CopyRows_Click">
+                                    <MenuFlyoutItem.KeyboardAccelerators>
+                                        <KeyboardAccelerator Modifiers="Control" Key="C" />
+                                    </MenuFlyoutItem.KeyboardAccelerators>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutItem Text="Copy as CSV" Click="CopyRowsAsCsv_Click" />
+                                <MenuFlyoutItem Text="Copy message only" Click="CopyMessage_Click" />
+                                <MenuFlyoutSeparator />
+                                <MenuFlyoutItem Text="Select all" Click="SelectAllRows_Click">
+                                    <MenuFlyoutItem.KeyboardAccelerators>
+                                        <KeyboardAccelerator Modifiers="Control" Key="A" />
+                                    </MenuFlyoutItem.KeyboardAccelerators>
+                                </MenuFlyoutItem>
+                            </MenuFlyout>
+                        </tkcontrols:DataGrid.ContextFlyout>
                         <tkcontrols:DataGrid.Columns>
                             <tkcontrols:DataGridTextColumn Header="Time" Binding="{Binding TimeCreatedDisplay}" Width="160" />
                             <tkcontrols:DataGridTextColumn Header="Level" Binding="{Binding LevelName}" Width="100" />
                             <tkcontrols:DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="60" />
                             <tkcontrols:DataGridTextColumn Header="Source" Binding="{Binding ProviderName}" Width="180" />
                             <tkcontrols:DataGridTextColumn Header="User" Binding="{Binding Username}" Width="120" />
-                            <tkcontrols:DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" />
+                            <tkcontrols:DataGridTextColumn Header="Message" Binding="{Binding Message, Converter={StaticResource SingleLineConverter}}" Width="*" />
                         </tkcontrols:DataGrid.Columns>
                     </tkcontrols:DataGrid>
                 </Border>
@@ -197,9 +215,15 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="Event Details" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <Button Grid.Column="1" Click="CollapseDetails_Click" Padding="6"
+                            <Button Grid.Column="1" Click="CopyAllDetails_Click" Padding="6" Margin="0,0,4,0"
+                                    ToolTipService.ToolTip="Copy all details"
+                                    Background="Transparent" BorderThickness="0">
+                                <FontIcon Glyph="&#xE8C8;" FontSize="14" />
+                            </Button>
+                            <Button Grid.Column="2" Click="CollapseDetails_Click" Padding="6"
                                     ToolTipService.ToolTip="Collapse details"
                                     Background="Transparent" BorderThickness="0">
                                 <FontIcon Glyph="&#xE74B;" FontSize="12" />
@@ -215,7 +239,7 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Event ID:" FontWeight="SemiBold" />
-                                        <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.SelectedEvent.Id, Mode=OneWay}" />
+                                        <TextBlock Grid.Column="1" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.Id, Mode=OneWay}" />
                                     </Grid>
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
@@ -223,7 +247,7 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Level:" FontWeight="SemiBold" />
-                                        <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.SelectedEvent.LevelName, Mode=OneWay}" />
+                                        <TextBlock Grid.Column="1" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.LevelName, Mode=OneWay}" />
                                     </Grid>
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
@@ -231,7 +255,7 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Time Created:" FontWeight="SemiBold" />
-                                        <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.SelectedEvent.TimeCreatedDisplay, Mode=OneWay}" />
+                                        <TextBlock Grid.Column="1" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.TimeCreatedDisplay, Mode=OneWay}" />
                                     </Grid>
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
@@ -239,7 +263,7 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Provider:" FontWeight="SemiBold" />
-                                        <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.SelectedEvent.ProviderName, Mode=OneWay}" TextWrapping="Wrap" />
+                                        <TextBlock Grid.Column="1" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.ProviderName, Mode=OneWay}" TextWrapping="Wrap" />
                                     </Grid>
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
@@ -247,7 +271,7 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Task:" FontWeight="SemiBold" />
-                                        <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.SelectedEvent.TaskName, Mode=OneWay}" />
+                                        <TextBlock Grid.Column="1" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.TaskName, Mode=OneWay}" />
                                     </Grid>
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
@@ -255,7 +279,7 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Keywords:" FontWeight="SemiBold" />
-                                        <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.SelectedEvent.Keywords, Mode=OneWay}" />
+                                        <TextBlock Grid.Column="1" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.Keywords, Mode=OneWay}" />
                                     </Grid>
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
@@ -263,7 +287,7 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="User:" FontWeight="SemiBold" />
-                                        <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.SelectedEvent.Username, Mode=OneWay}" />
+                                        <TextBlock Grid.Column="1" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.Username, Mode=OneWay}" />
                                     </Grid>
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
@@ -283,11 +307,11 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Computer:" FontWeight="SemiBold" />
-                                        <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.SelectedEvent.Computer, Mode=OneWay}" />
+                                        <TextBlock Grid.Column="1" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.Computer, Mode=OneWay}" />
                                     </Grid>
                                     <StackPanel Spacing="6" Margin="0,4,0,0">
                                         <TextBlock Text="Message:" FontWeight="SemiBold" />
-                                        <TextBlock Text="{x:Bind ViewModel.SelectedEvent.Message, Mode=OneWay}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{x:Bind ViewModel.SelectedEvent.Message, Mode=OneWay}" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
                                     </StackPanel>
                                     <Expander Header="XML View" HorizontalAlignment="Stretch" Margin="0,8,0,0">
                                         <TextBox Text="{x:Bind ViewModel.SelectedEvent.Xml, Mode=OneWay}"
