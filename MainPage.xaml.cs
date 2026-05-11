@@ -11,7 +11,6 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using Windows.ApplicationModel.DataTransfer;
-using Windows.Storage.Pickers;
 using WinRT.Interop;
 
 namespace SimpleEventViewer_WinUI;
@@ -144,58 +143,46 @@ public sealed partial class MainPage : Page
         ViewModel.RefreshCurrentView();
     }
 
-    private async void LoadEvtxFile_Click(object sender, RoutedEventArgs e)
+    private void LoadEvtxFile_Click(object sender, RoutedEventArgs e)
     {
-        var path = await PickFileAsync(".evtx");
+        var path = PickFile("Select EVTX file", "Event log files", ".evtx");
         if (!string.IsNullOrEmpty(path))
         {
             ViewModel.LoadFile(path, "evtx");
         }
     }
 
-    private async void LoadXmlFile_Click(object sender, RoutedEventArgs e)
+    private void LoadXmlFile_Click(object sender, RoutedEventArgs e)
     {
-        var path = await PickFileAsync(".xml");
+        var path = PickFile("Select XML file", "XML files", ".xml");
         if (!string.IsNullOrEmpty(path))
         {
             ViewModel.LoadFile(path, "xml");
         }
     }
 
-    private async void LoadEtlFile_Click(object sender, RoutedEventArgs e)
+    private void LoadEtlFile_Click(object sender, RoutedEventArgs e)
     {
-        var path = await PickFileAsync(".etl");
+        var path = PickFile("Select ETL file", "Event trace logs", ".etl");
         if (!string.IsNullOrEmpty(path))
         {
             ViewModel.LoadFile(path, "etl");
         }
     }
 
-    private async System.Threading.Tasks.Task<string?> PickFileAsync(string extension)
+    private string? PickFile(string title, string filterLabel, string extension)
     {
         try
         {
-            var picker = new FileOpenPicker();
             var window = (Application.Current as App)?.MainWindow;
-            if (window == null)
-            {
-                ViewModel.StatusMessage = "Error: main window not found";
-                return null;
-            }
-
-            var hwnd = WindowNative.GetWindowHandle(window);
-            InitializeWithWindow.Initialize(picker, hwnd);
-
-            picker.FileTypeFilter.Add(extension);
-            picker.SuggestedStartLocation = PickerLocationId.Desktop;
-
-            var file = await picker.PickSingleFileAsync();
-            return file?.Path;
+            var hwnd = window != null
+                ? WindowNative.GetWindowHandle(window)
+                : IntPtr.Zero;
+            return Win32FilePicker.PickFile(hwnd, title, filterLabel, extension);
         }
         catch (Exception ex)
         {
             ViewModel.StatusMessage = $"File picker error: {ex.Message}";
-            System.Diagnostics.Debug.WriteLine($"Picker error: {ex}");
             return null;
         }
     }
