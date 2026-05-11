@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using SimpleEventViewer_WinUI.Models;
 using SimpleEventViewer_WinUI.Services;
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
@@ -10,6 +11,8 @@ namespace SimpleEventViewer_WinUI.ViewModels;
 public partial class MainViewModel : ObservableObject
 {
     private readonly DispatcherQueue _dispatcherQueue;
+    private readonly ConcurrentQueue<EventLogEntry> _pendingEvents = new();
+    private DispatcherQueueTimer? _flushTimer;
 
     private string _statusMessage = "Ready";
     private SourceCategory? _selectedSource;
@@ -41,7 +44,7 @@ public partial class MainViewModel : ObservableObject
 
         EventLogService.Instance.OnEventsLoaded += count =>
         {
-            if (count % 100 == 0 || count == _totalEventCount)
+            if (count % 500 == 0)
             {
                 var total = _totalEventCount > 0 ? _totalEventCount.ToString() : "counting...";
                 _dispatcherQueue.TryEnqueue(() =>
@@ -51,33 +54,48 @@ public partial class MainViewModel : ObservableObject
             }
         };
 
+        // Background thread: just queue the entries - flush timer handles UI updates
         EventLogService.Instance.OnEventBatchLoaded += batch =>
         {
             if (!_isStreaming) return;
 
-            // Capture batch on background thread then marshal to UI thread
-            var batchCopy = batch.ToList();
-            _dispatcherQueue.TryEnqueue(() =>
+            foreach (var entry in batch)
             {
-                if (!_isStreaming) return;
-
-                // Apply filters to the batch and add matching entries
-                foreach (var entry in batchCopy)
-                {
-                    if (MatchesFilters(entry))
-                    {
-                        InsertSorted(entry);
-                    }
-                }
-            });
+                _pendingEvents.Enqueue(entry);
+            }
         };
 
         EventLogService.Instance.OnLoadComplete += () =>
         {
-            _isStreaming = false;
+            _dispatcherQueue.TryEnqueue(() =>
+            {
+                FlushPendingEvents(); // Final flush
+                _isStreaming = false;
+                _flushTimer?.Stop();
+            });
         };
 
+        // Setup throttled flush timer
+        _flushTimer = _dispatcherQueue.CreateTimer();
+        _flushTimer.Interval = TimeSpan.FromMilliseconds(200);
+        _flushTimer.Tick += (s, e) => FlushPendingEvents();
+
         _ = LoadSystemLogsAsync();
+    }
+
+    private void FlushPendingEvents()
+    {
+        // Drain up to N events per tick to keep UI responsive
+        const int maxPerTick = 500;
+        int drained = 0;
+        while (drained < maxPerTick && _pendingEvents.TryDequeue(out var entry))
+        {
+            if (MatchesFilters(entry))
+            {
+                FilteredEvents.Add(entry);
+            }
+            drained++;
+        }
     }
 
     public ObservableCollection<SourceCategory> SourceCategories
@@ -199,9 +217,12 @@ public partial class MainViewModel : ObservableObject
         SelectedSource = SourceCategories[0];
         _totalEventCount = -1;
 
+        // Clear any leftover queue
+        while (_pendingEvents.TryDequeue(out _)) { }
+
         try
         {
-            // Kick off count in parallel - results update progress display once known
+            // Kick off count in parallel
             _ = Task.Run(() =>
             {
                 try
@@ -212,14 +233,23 @@ public partial class MainViewModel : ObservableObject
                 catch { }
             });
 
-            // Enable streaming - events will flow in via OnEventBatchLoaded as they load
+            // Enable streaming and start the flush timer
             _isStreaming = true;
+            _flushTimer?.Start();
 
             await Task.Run(() => EventLogService.Instance.LoadCurrentSystemLogs());
 
             _dispatcherQueue.TryEnqueue(() =>
             {
+                // Final drain of any remaining events
+                FlushPendingEvents();
+                while (_pendingEvents.Count > 0)
+                {
+                    FlushPendingEvents();
+                }
+
                 _isStreaming = false;
+                _flushTimer?.Stop();
                 UpdateSourceCategories();
                 StatusMessage = $"Loaded {EventLogService.Instance.Events.Count} events from system";
             });
@@ -227,6 +257,7 @@ public partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             _isStreaming = false;
+            _flushTimer?.Stop();
             _dispatcherQueue.TryEnqueue(() =>
             {
                 StatusMessage = $"Error: {ex.Message}";
@@ -292,25 +323,6 @@ public partial class MainViewModel : ObservableObject
                (string.IsNullOrEmpty(SearchText) || entry.Message.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
     }
 
-    private void InsertSorted(EventLogEntry entry)
-    {
-        // Most recent events first - binary search for insertion point
-        int low = 0;
-        int high = FilteredEvents.Count;
-        while (low < high)
-        {
-            int mid = (low + high) / 2;
-            if (FilteredEvents[mid].TimeCreated > entry.TimeCreated)
-            {
-                low = mid + 1;
-            }
-            else
-            {
-                high = mid;
-            }
-        }
-        FilteredEvents.Insert(low, entry);
-    }
 
     public void ApplyFilters()
     {

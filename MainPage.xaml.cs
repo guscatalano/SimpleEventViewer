@@ -122,13 +122,15 @@ public sealed partial class MainPage : Page
         CollapsedFilterButton.Visibility = Visibility.Collapsed;
     }
 
+    private static readonly LevelToRowBrushConverter _rowBrushConverter = new();
+    private static readonly SolidColorBrush _transparentBrush = new(Microsoft.UI.Colors.Transparent);
+
     private void EventsDataGrid_LoadingRow(object? sender, DataGridRowEventArgs e)
     {
         if (e.Row.DataContext is EventLogEntry entry)
         {
-            var converter = new LevelToRowBrushConverter();
-            var brush = converter.Convert(entry.Level, typeof(Brush), null, "") as Brush;
-            e.Row.Background = brush ?? new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+            var brush = _rowBrushConverter.Convert(entry.Level, typeof(Brush), null, "") as Brush;
+            e.Row.Background = brush ?? _transparentBrush;
         }
     }
 }
