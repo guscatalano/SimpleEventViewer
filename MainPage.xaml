@@ -7,6 +7,7 @@
     xmlns:local="using:SimpleEventViewer_WinUI"
     xmlns:models="using:SimpleEventViewer_WinUI.Models"
     xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:tkcontrols="using:CommunityToolkit.WinUI.UI.Controls"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
@@ -120,11 +121,11 @@
             </Border>
 
             <!-- Grid splitter for resizing -->
-            <controls:ContentSizer x:Name="FilterSplitter" Grid.Column="1"
+            <controls:GridSplitter x:Name="FilterSplitter" Grid.Column="1"
                                    Width="6"
                                    HorizontalAlignment="Center" VerticalAlignment="Stretch"
-                                   TargetControl="{x:Bind FilterPanel}"
-                                   Orientation="Vertical" />
+                                   ResizeBehavior="PreviousAndCurrent"
+                                   ResizeDirection="Auto" />
 
             <!-- Collapsed filter button (only visible when collapsed) -->
             <Border x:Name="CollapsedFilterButton" Grid.Column="2" Visibility="Collapsed"
@@ -151,69 +152,28 @@
                 <Border Grid.Row="0" Background="{ThemeResource LayerFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1" CornerRadius="8">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-
-                        <Grid Grid.Row="0" Padding="12,8" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="160" />
-                                <ColumnDefinition Width="80" />
-                                <ColumnDefinition Width="60" />
-                                <ColumnDefinition Width="180" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Time" FontWeight="SemiBold" />
-                            <TextBlock Grid.Column="1" Text="Level" FontWeight="SemiBold" />
-                            <TextBlock Grid.Column="2" Text="ID" FontWeight="SemiBold" />
-                            <TextBlock Grid.Column="3" Text="Source" FontWeight="SemiBold" />
-                            <TextBlock Grid.Column="4" Text="Message" FontWeight="SemiBold" />
-                        </Grid>
-
-                        <ListView Grid.Row="1"
-                                  ItemsSource="{x:Bind ViewModel.FilteredEvents, Mode=OneWay}"
-                                  SelectedItem="{x:Bind ViewModel.SelectedEvent, Mode=TwoWay}"
-                                  SelectionMode="Single">
-                            <ListView.ItemContainerStyle>
-                                <Style TargetType="ListViewItem">
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                    <Setter Property="Padding" Value="12,4" />
-                                </Style>
-                            </ListView.ItemContainerStyle>
-                            <ListView.ItemTemplate>
-                                <DataTemplate x:DataType="models:EventLogEntry">
-                                    <Border Background="{x:Bind Level, Converter={StaticResource LevelToRowBrushConverter}}"
-                                            CornerRadius="4" Padding="4,2">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="160" />
-                                                <ColumnDefinition Width="80" />
-                                                <ColumnDefinition Width="60" />
-                                                <ColumnDefinition Width="180" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="{x:Bind TimeCreatedDisplay}" VerticalAlignment="Center" />
-                                            <Border Grid.Column="1" CornerRadius="4" Padding="6,2" Margin="0,0,8,0"
-                                                    HorizontalAlignment="Left"
-                                                    Visibility="{x:Bind Level, Converter={StaticResource BadgeVisibilityConverter}}"
-                                                    Background="{x:Bind Level, Converter={StaticResource LevelToBrushConverter}}">
-                                                <TextBlock Text="{x:Bind LevelName}"
-                                                           Foreground="{x:Bind Level, Converter={StaticResource LevelToTextBrushConverter}}"
-                                                           FontSize="11" FontWeight="SemiBold" />
-                                            </Border>
-                                            <TextBlock Grid.Column="1" Text="{x:Bind LevelName}" VerticalAlignment="Center"
-                                                       Visibility="{x:Bind Level, Converter={StaticResource PlainLevelVisibilityConverter}}" />
-                                            <TextBlock Grid.Column="2" Text="{x:Bind Id}" VerticalAlignment="Center" />
-                                            <TextBlock Grid.Column="3" Text="{x:Bind ProviderName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                            <TextBlock Grid.Column="4" Text="{x:Bind Message}" TextTrimming="CharacterEllipsis" MaxLines="1" VerticalAlignment="Center" />
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
-                    </Grid>
+                    <tkcontrols:DataGrid x:Name="EventsDataGrid"
+                                          ItemsSource="{x:Bind ViewModel.FilteredEvents, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedEvent, Mode=TwoWay}"
+                                          AutoGenerateColumns="False"
+                                          CanUserResizeColumns="True"
+                                          CanUserSortColumns="True"
+                                          CanUserReorderColumns="True"
+                                          GridLinesVisibility="Horizontal"
+                                          HeadersVisibility="Column"
+                                          SelectionMode="Single"
+                                          IsReadOnly="True"
+                                          RowBackground="Transparent"
+                                          LoadingRow="EventsDataGrid_LoadingRow">
+                        <tkcontrols:DataGrid.Columns>
+                            <tkcontrols:DataGridTextColumn Header="Time" Binding="{Binding TimeCreatedDisplay}" Width="160" />
+                            <tkcontrols:DataGridTextColumn Header="Level" Binding="{Binding LevelName}" Width="100" />
+                            <tkcontrols:DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="60" />
+                            <tkcontrols:DataGridTextColumn Header="Source" Binding="{Binding ProviderName}" Width="180" />
+                            <tkcontrols:DataGridTextColumn Header="User" Binding="{Binding Username}" Width="120" />
+                            <tkcontrols:DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" />
+                        </tkcontrols:DataGrid.Columns>
+                    </tkcontrols:DataGrid>
                 </Border>
 
                 <!-- Event details -->

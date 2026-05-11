@@ -1,5 +1,8 @@
+using CommunityToolkit.WinUI.UI.Controls;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using SimpleEventViewer_WinUI.Models;
 using SimpleEventViewer_WinUI.Services;
 using SimpleEventViewer_WinUI.ViewModels;
 using Windows.Storage.Pickers;
@@ -117,5 +120,15 @@ public sealed partial class MainPage : Page
         FilterPanel.Visibility = Visibility.Visible;
         FilterSplitter.Visibility = Visibility.Visible;
         CollapsedFilterButton.Visibility = Visibility.Collapsed;
+    }
+
+    private void EventsDataGrid_LoadingRow(object? sender, DataGridRowEventArgs e)
+    {
+        if (e.Row.DataContext is EventLogEntry entry)
+        {
+            var converter = new LevelToRowBrushConverter();
+            var brush = converter.Convert(entry.Level, typeof(Brush), null, "") as Brush;
+            e.Row.Background = brush ?? new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+        }
     }
 }
