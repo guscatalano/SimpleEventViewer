@@ -21,6 +21,20 @@ public class NullToVisibilityConverter : IValueConverter
     }
 }
 
+public class NullToVisibleConverter : IValueConverter
+{
+    // Inverse: shows when value is null
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        return value == null ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    {
+        throw new NotImplementedException();
+    }
+}
+
 public class DateOffsetConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, string language)
