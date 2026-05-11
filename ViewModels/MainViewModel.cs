@@ -45,6 +45,7 @@ public partial class MainViewModel : ObservableObject
     private bool _hasLoadedData = false;
     private System.Threading.CancellationTokenSource? _prefetchCts;
     private bool _isPrefetching = false;
+    private bool _suppressApplyFilters = false;
 
     public MainViewModel()
     {
@@ -681,6 +682,8 @@ public partial class MainViewModel : ObservableObject
 
     public void ApplyFilters()
     {
+        if (_suppressApplyFilters) return;
+
         var startTime = GetEffectiveStartTime();
         var endTime = GetEffectiveEndTime();
         var sourceName = SelectedSource == null || SelectedSource.IsAllSources ? null : SelectedSource.Name;
@@ -773,6 +776,7 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
+            _suppressApplyFilters = true;
             await Task.Run(() =>
             {
                 switch (fileType.ToLower())
@@ -789,13 +793,16 @@ public partial class MainViewModel : ObservableObject
                 }
             });
 
-            // We're back on the UI thread after await
+            // We're back on the UI thread after await. Rebuild categories without
+            // each rebuild triggering a redundant ApplyFilters call.
             UpdateSourceCategories();
+            _suppressApplyFilters = false;
             ApplyFilters();
             StatusMessage = $"Loaded {EventLogService.Instance.Events.Count} events from {fileType} file";
         }
         catch (Exception ex)
         {
+            _suppressApplyFilters = false;
             _isStreaming = false;
             _flushTimer?.Stop();
             StatusMessage = $"Error: {ex.Message}";

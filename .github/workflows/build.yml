@@ -45,6 +45,9 @@ jobs:
       - name: Restore
         run: msbuild SimpleEventViewer.WinUI.csproj /t:Restore /p:Configuration=$env:Configuration /p:Platform=$env:Platform
 
+      - name: Run tests
+        run: dotnet test tests/SimpleEventViewer.Tests.csproj --configuration $env:Configuration
+
       - name: Build MSIX
         run: |
           msbuild SimpleEventViewer.WinUI.csproj `
