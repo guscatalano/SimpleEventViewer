@@ -167,31 +167,27 @@
                                           IsReadOnly="True"
                                           RowBackground="Transparent"
                                           RowHeight="32"
+                                          RightTapped="EventsDataGrid_RightTapped"
                                           LoadingRow="EventsDataGrid_LoadingRow">
-                        <tkcontrols:DataGrid.ContextFlyout>
-                            <MenuFlyout>
-                                <MenuFlyoutItem Text="Copy" Click="CopyRows_Click">
-                                    <MenuFlyoutItem.KeyboardAccelerators>
-                                        <KeyboardAccelerator Modifiers="Control" Key="C" />
-                                    </MenuFlyoutItem.KeyboardAccelerators>
-                                </MenuFlyoutItem>
-                                <MenuFlyoutItem Text="Copy as CSV" Click="CopyRowsAsCsv_Click" />
-                                <MenuFlyoutItem Text="Copy message only" Click="CopyMessage_Click" />
-                                <MenuFlyoutSeparator />
-                                <MenuFlyoutItem Text="Select all" Click="SelectAllRows_Click">
-                                    <MenuFlyoutItem.KeyboardAccelerators>
-                                        <KeyboardAccelerator Modifiers="Control" Key="A" />
-                                    </MenuFlyoutItem.KeyboardAccelerators>
-                                </MenuFlyoutItem>
-                            </MenuFlyout>
-                        </tkcontrols:DataGrid.ContextFlyout>
                         <tkcontrols:DataGrid.Columns>
                             <tkcontrols:DataGridTextColumn Header="Time" Binding="{Binding TimeCreatedDisplay}" Width="160" />
                             <tkcontrols:DataGridTextColumn Header="Level" Binding="{Binding LevelName}" Width="100" />
                             <tkcontrols:DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="60" />
                             <tkcontrols:DataGridTextColumn Header="Source" Binding="{Binding ProviderName}" Width="180" />
                             <tkcontrols:DataGridTextColumn Header="User" Binding="{Binding Username}" Width="120" />
-                            <tkcontrols:DataGridTextColumn Header="Message" Binding="{Binding Message, Converter={StaticResource SingleLineConverter}}" Width="*" />
+                            <tkcontrols:DataGridTemplateColumn Header="Message" Width="*">
+                                <tkcontrols:DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Message}"
+                                                   x:Name="MessageText"
+                                                   TextWrapping="Wrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   MaxLines="1"
+                                                   VerticalAlignment="Center"
+                                                   Loaded="MessageText_Loaded" />
+                                    </DataTemplate>
+                                </tkcontrols:DataGridTemplateColumn.CellTemplate>
+                            </tkcontrols:DataGridTemplateColumn>
                         </tkcontrols:DataGrid.Columns>
                     </tkcontrols:DataGrid>
                 </Border>

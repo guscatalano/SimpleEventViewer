@@ -1,6 +1,8 @@
 using CommunityToolkit.WinUI.UI.Controls;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using SimpleEventViewer_WinUI.Models;
 using SimpleEventViewer_WinUI.Services;
@@ -17,20 +19,67 @@ public sealed partial class MainPage : Page
 {
     public MainViewModel ViewModel { get; }
 
+    private readonly MenuFlyout _rowContextMenu;
+
     public MainPage()
     {
         ViewModel = new MainViewModel();
+        _rowContextMenu = BuildRowContextMenu();
         InitializeComponent();
+
+        ApplyRowHeight();
 
         // Refresh row colors when theme/color scheme changes
         SettingsService.Instance.ThemeChanged += OnThemeChanged;
     }
 
+    private MenuFlyout BuildRowContextMenu()
+    {
+        var menu = new MenuFlyout();
+
+        var copyItem = new MenuFlyoutItem { Text = "Copy" };
+        copyItem.Click += CopyRows_Click;
+        copyItem.KeyboardAccelerators.Add(new KeyboardAccelerator { Modifiers = Windows.System.VirtualKeyModifiers.Control, Key = Windows.System.VirtualKey.C });
+        menu.Items.Add(copyItem);
+
+        var csvItem = new MenuFlyoutItem { Text = "Copy as CSV" };
+        csvItem.Click += CopyRowsAsCsv_Click;
+        menu.Items.Add(csvItem);
+
+        var msgItem = new MenuFlyoutItem { Text = "Copy message only" };
+        msgItem.Click += CopyMessage_Click;
+        menu.Items.Add(msgItem);
+
+        menu.Items.Add(new MenuFlyoutSeparator());
+
+        var selectAll = new MenuFlyoutItem { Text = "Select all" };
+        selectAll.Click += SelectAllRows_Click;
+        selectAll.KeyboardAccelerators.Add(new KeyboardAccelerator { Modifiers = Windows.System.VirtualKeyModifiers.Control, Key = Windows.System.VirtualKey.A });
+        menu.Items.Add(selectAll);
+
+        return menu;
+    }
+
+    private void EventsDataGrid_RightTapped(object sender, RightTappedRoutedEventArgs e)
+    {
+        // If the right-clicked row isn't already in the selection, make it the only selection
+        var fe = e.OriginalSource as FrameworkElement;
+        var dc = fe?.DataContext;
+        if (dc is EventLogEntry entry && !EventsDataGrid.SelectedItems.Contains(entry))
+        {
+            EventsDataGrid.SelectedItems.Clear();
+            EventsDataGrid.SelectedItems.Add(entry);
+        }
+
+        _rowContextMenu.ShowAt(EventsDataGrid, e.GetPosition(EventsDataGrid));
+        e.Handled = true;
+    }
+
     private void OnThemeChanged()
     {
-        // Force ListView to re-render items by triggering a refresh of the ItemsSource
         DispatcherQueue.TryEnqueue(() =>
         {
+            ApplyRowHeight();
             var temp = ViewModel.FilteredEvents.ToList();
             ViewModel.FilteredEvents.Clear();
             foreach (var item in temp)
@@ -38,6 +87,20 @@ public sealed partial class MainPage : Page
                 ViewModel.FilteredEvents.Add(item);
             }
         });
+    }
+
+    private void ApplyRowHeight()
+    {
+        var lines = SettingsService.Instance.MaxRowLines;
+        EventsDataGrid.RowHeight = lines == 2 ? 52 : 32;
+    }
+
+    private void MessageText_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBlock tb)
+        {
+            tb.MaxLines = SettingsService.Instance.MaxRowLines;
+        }
     }
 
     private void RefreshButton_Click(object sender, RoutedEventArgs e)
