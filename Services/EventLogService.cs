@@ -13,11 +13,28 @@ public class EventLogService
 
     private readonly ConcurrentBag<EventLogEntry> _events = new();
     private readonly ConcurrentDictionary<string, int> _sourceCounts = new();
+    private readonly ConcurrentDictionary<string, int> _processCounts = new();
+    private readonly ConcurrentDictionary<string, int> _userCounts = new();
+    private readonly ConcurrentDictionary<string, int> _computerCounts = new();
 
     public IReadOnlyList<EventLogEntry> Events => _events.ToList().AsReadOnly();
-    public IReadOnlyDictionary<string, int> SourceCounts => _sourceCounts.ToDictionary(k => k.Key, v => v.Value) as IReadOnlyDictionary<string, int>;
+    public IReadOnlyDictionary<string, int> SourceCounts => _sourceCounts.ToDictionary(k => k.Key, v => v.Value);
+    public IReadOnlyDictionary<string, int> ProcessCounts => _processCounts.ToDictionary(k => k.Key, v => v.Value);
+    public IReadOnlyDictionary<string, int> UserCounts => _userCounts.ToDictionary(k => k.Key, v => v.Value);
+    public IReadOnlyDictionary<string, int> ComputerCounts => _computerCounts.ToDictionary(k => k.Key, v => v.Value);
 
     private EventLogService() { }
+
+    private void TrackCounts(EventLogEntry entry)
+    {
+        _sourceCounts.AddOrUpdate(entry.ProviderName, 1, (k, c) => c + 1);
+        if (entry.ProcessId > 0)
+            _processCounts.AddOrUpdate(entry.ProcessId.ToString(), 1, (k, c) => c + 1);
+        if (!string.IsNullOrEmpty(entry.Username))
+            _userCounts.AddOrUpdate(entry.Username, 1, (k, c) => c + 1);
+        if (!string.IsNullOrEmpty(entry.Computer))
+            _computerCounts.AddOrUpdate(entry.Computer, 1, (k, c) => c + 1);
+    }
 
     private static string BuildQuery(TimeSpan? lookback, DateTime? start = null, DateTime? end = null)
     {
@@ -83,8 +100,7 @@ public class EventLogService
             {
                 _events.Add(logEntry);
                 batch.Add(logEntry);
-                var source = logEntry.ProviderName;
-                _sourceCounts.AddOrUpdate(source, 1, (key, count) => count + 1);
+                TrackCounts(logEntry);
 
                 if (batch.Count >= batchSize)
                 {
@@ -109,6 +125,9 @@ public class EventLogService
     {
         _events.Clear();
         _sourceCounts.Clear();
+        _processCounts.Clear();
+        _userCounts.Clear();
+        _computerCounts.Clear();
 
         var query = new EventLogQuery("Application", PathType.LogName, BuildQuery(lookback, start, end))
         {
@@ -130,8 +149,7 @@ public class EventLogService
             {
                 _events.Add(logEntry);
                 batch.Add(logEntry);
-                var source = logEntry.ProviderName;
-                _sourceCounts.AddOrUpdate(source, 1, (key, count) => count + 1);
+                TrackCounts(logEntry);
 
                 if (batch.Count >= batchSize)
                 {
@@ -156,6 +174,9 @@ public class EventLogService
     {
         _events.Clear();
         _sourceCounts.Clear();
+        _processCounts.Clear();
+        _userCounts.Clear();
+        _computerCounts.Clear();
 
         var psi = new System.Diagnostics.ProcessStartInfo
         {
@@ -182,6 +203,9 @@ public class EventLogService
     {
         _events.Clear();
         _sourceCounts.Clear();
+        _processCounts.Clear();
+        _userCounts.Clear();
+        _computerCounts.Clear();
 
         var xmlContent = File.ReadAllText(filePath);
 
@@ -199,8 +223,7 @@ public class EventLogService
                     if (entry != null)
                     {
                         _events.Add(entry);
-                        var source = entry.ProviderName;
-                        _sourceCounts.AddOrUpdate(source, 1, (key, count) => count + 1);
+                        TrackCounts(entry);
                     }
                 }
             }
@@ -211,6 +234,9 @@ public class EventLogService
     {
         _events.Clear();
         _sourceCounts.Clear();
+        _processCounts.Clear();
+        _userCounts.Clear();
+        _computerCounts.Clear();
 
         var psi = new System.Diagnostics.ProcessStartInfo
         {
@@ -239,7 +265,9 @@ public class EventLogService
         DateTime? startTime = null,
         DateTime? endTime = null,
         string? username = null,
-        string? searchTerms = null)
+        string? searchTerms = null,
+        string? processId = null,
+        string? computer = null)
     {
         var allEvents = _events.ToList();
         return allEvents.Where(e =>
@@ -247,12 +275,17 @@ public class EventLogService
             (level == null || e.Level == level.Value) &&
             (!startTime.HasValue || e.TimeCreated >= startTime.Value) &&
             (!endTime.HasValue || e.TimeCreated <= endTime.Value) &&
-            (string.IsNullOrEmpty(username) || e.Username.Contains(username, StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrEmpty(username) || e.Username == username) &&
+            (string.IsNullOrEmpty(processId) || e.ProcessId.ToString() == processId) &&
+            (string.IsNullOrEmpty(computer) || e.Computer == computer) &&
             (string.IsNullOrEmpty(searchTerms) || e.Message.Contains(searchTerms, StringComparison.OrdinalIgnoreCase))
         ).OrderByDescending(e => e.TimeCreated).ToList();
     }
 
     public List<string> GetAvailableSources() => _sourceCounts.OrderByDescending(x => x.Value).Select(x => x.Key).ToList();
+    public List<string> GetAvailableProcesses() => _processCounts.OrderByDescending(x => x.Value).Select(x => x.Key).ToList();
+    public List<string> GetAvailableUsers() => _userCounts.OrderByDescending(x => x.Value).Select(x => x.Key).ToList();
+    public List<string> GetAvailableComputers() => _computerCounts.OrderByDescending(x => x.Value).Select(x => x.Key).ToList();
 
     private EventLogEntry? ConvertToEntry(EventRecord record)
     {
@@ -352,8 +385,7 @@ public class EventLogService
                     if (entry != null)
                     {
                         _events.Add(entry);
-                        var source = entry.ProviderName;
-                        _sourceCounts.AddOrUpdate(source, 1, (key, count) => count + 1);
+                        TrackCounts(entry);
                     }
                 }
             }

@@ -17,6 +17,9 @@ public partial class MainViewModel : ObservableObject
 
     private string _statusMessage = "Ready";
     private SourceCategory? _selectedSource;
+    private SourceCategory? _selectedProcess;
+    private SourceCategory? _selectedUser;
+    private SourceCategory? _selectedComputer;
     private EventTypeItem _selectedType = null!;
     private DateTimeOffset? _startTime;
     private DateTimeOffset? _endTime;
@@ -25,6 +28,9 @@ public partial class MainViewModel : ObservableObject
     private string _searchText = string.Empty;
     private EventLogEntry? _selectedEvent;
     private ObservableCollection<SourceCategory> _sourceCategories = new();
+    private ObservableCollection<SourceCategory> _processCategories = new();
+    private ObservableCollection<SourceCategory> _userCategories = new();
+    private ObservableCollection<SourceCategory> _computerCategories = new();
     private ObservableCollection<EventLogEntry> _filteredEvents = new();
     private int _totalEventCount = -1;
     private bool _isStreaming = false;
@@ -176,6 +182,60 @@ public partial class MainViewModel : ObservableObject
     {
         get => _sourceCategories;
         set => SetProperty(ref _sourceCategories, value);
+    }
+
+    public ObservableCollection<SourceCategory> ProcessCategories
+    {
+        get => _processCategories;
+        set => SetProperty(ref _processCategories, value);
+    }
+
+    public ObservableCollection<SourceCategory> UserCategories
+    {
+        get => _userCategories;
+        set => SetProperty(ref _userCategories, value);
+    }
+
+    public ObservableCollection<SourceCategory> ComputerCategories
+    {
+        get => _computerCategories;
+        set => SetProperty(ref _computerCategories, value);
+    }
+
+    public SourceCategory? SelectedProcess
+    {
+        get => _selectedProcess;
+        set
+        {
+            if (SetProperty(ref _selectedProcess, value))
+            {
+                ApplyFilters();
+            }
+        }
+    }
+
+    public SourceCategory? SelectedUser
+    {
+        get => _selectedUser;
+        set
+        {
+            if (SetProperty(ref _selectedUser, value))
+            {
+                ApplyFilters();
+            }
+        }
+    }
+
+    public SourceCategory? SelectedComputer
+    {
+        get => _selectedComputer;
+        set
+        {
+            if (SetProperty(ref _selectedComputer, value))
+            {
+                ApplyFilters();
+            }
+        }
     }
 
     public ObservableCollection<EventLogEntry> FilteredEvents
@@ -375,6 +435,18 @@ public partial class MainViewModel : ObservableObject
         SourceCategories.Clear();
         SourceCategories.Add(new SourceCategory { Name = "All Sources", Count = 0, IsAllSources = true });
         SelectedSource = SourceCategories[0];
+
+        ProcessCategories.Clear();
+        ProcessCategories.Add(new SourceCategory { Name = "All Processes", Count = 0, IsAllSources = true });
+        SelectedProcess = ProcessCategories[0];
+
+        UserCategories.Clear();
+        UserCategories.Add(new SourceCategory { Name = "All Users", Count = 0, IsAllSources = true });
+        SelectedUser = UserCategories[0];
+
+        ComputerCategories.Clear();
+        ComputerCategories.Add(new SourceCategory { Name = "All Computers", Count = 0, IsAllSources = true });
+        SelectedComputer = ComputerCategories[0];
         _totalEventCount = -1;
 
         // Clear any leftover queue
@@ -455,34 +527,58 @@ public partial class MainViewModel : ObservableObject
 
     private void UpdateSourceCategories()
     {
-        // Preserve current selection
-        var currentSelectionName = SelectedSource?.Name;
+        var totalCount = EventLogService.Instance.Events.Count;
 
-        SourceCategories.Clear();
-        SourceCategories.Add(new SourceCategory { Name = "All Sources", Count = EventLogService.Instance.Events.Count, IsAllSources = true });
+        RefreshCategoryList(SourceCategories, "All Sources", totalCount,
+            EventLogService.Instance.GetAvailableSources(),
+            EventLogService.Instance.SourceCounts,
+            SelectedSource?.Name,
+            v => SelectedSource = v);
 
-        foreach (var source in EventLogService.Instance.GetAvailableSources())
+        RefreshCategoryList(ProcessCategories, "All Processes", totalCount,
+            EventLogService.Instance.GetAvailableProcesses(),
+            EventLogService.Instance.ProcessCounts,
+            SelectedProcess?.Name,
+            v => SelectedProcess = v);
+
+        RefreshCategoryList(UserCategories, "All Users", totalCount,
+            EventLogService.Instance.GetAvailableUsers(),
+            EventLogService.Instance.UserCounts,
+            SelectedUser?.Name,
+            v => SelectedUser = v);
+
+        RefreshCategoryList(ComputerCategories, "All Computers", totalCount,
+            EventLogService.Instance.GetAvailableComputers(),
+            EventLogService.Instance.ComputerCounts,
+            SelectedComputer?.Name,
+            v => SelectedComputer = v);
+    }
+
+    private static void RefreshCategoryList(
+        ObservableCollection<SourceCategory> list,
+        string allLabel,
+        int totalCount,
+        List<string> values,
+        IReadOnlyDictionary<string, int> counts,
+        string? currentName,
+        Action<SourceCategory?> setSelected)
+    {
+        list.Clear();
+        list.Add(new SourceCategory { Name = allLabel, Count = totalCount, IsAllSources = true });
+        foreach (var v in values)
         {
-            var count = EventLogService.Instance.SourceCounts[source];
-            SourceCategories.Add(new SourceCategory { Name = source, Count = count, IsAllSources = false });
+            counts.TryGetValue(v, out var c);
+            list.Add(new SourceCategory { Name = v, Count = c, IsAllSources = false });
         }
 
-        // Restore selection by name
-        if (!string.IsNullOrEmpty(currentSelectionName))
+        if (!string.IsNullOrEmpty(currentName))
         {
-            var match = SourceCategories.FirstOrDefault(c => c.Name == currentSelectionName);
-            if (match != null)
-            {
-                SelectedSource = match;
-            }
-            else
-            {
-                SelectedSource = SourceCategories[0];
-            }
+            var match = list.FirstOrDefault(c => c.Name == currentName);
+            setSelected(match ?? list[0]);
         }
-        else if (SourceCategories.Count > 0)
+        else
         {
-            SelectedSource = SourceCategories[0];
+            setSelected(list[0]);
         }
     }
 
@@ -527,11 +623,17 @@ public partial class MainViewModel : ObservableObject
         var startTime = GetEffectiveStartTime();
         var endTime = GetEffectiveEndTime();
         var sourceName = SelectedSource == null || SelectedSource.IsAllSources ? null : SelectedSource.Name;
+        var processId = SelectedProcess == null || SelectedProcess.IsAllSources ? null : SelectedProcess.Name;
+        var userName = SelectedUser == null || SelectedUser.IsAllSources ? null : SelectedUser.Name;
+        var computer = SelectedComputer == null || SelectedComputer.IsAllSources ? null : SelectedComputer.Name;
 
         return (string.IsNullOrEmpty(sourceName) || entry.ProviderName == sourceName) &&
                (SelectedType?.Level == null || entry.Level == SelectedType.Level.Value) &&
                (entry.TimeCreated >= startTime) &&
                (entry.TimeCreated <= endTime) &&
+               (string.IsNullOrEmpty(processId) || entry.ProcessId.ToString() == processId) &&
+               (string.IsNullOrEmpty(userName) || entry.Username == userName) &&
+               (string.IsNullOrEmpty(computer) || entry.Computer == computer) &&
                (string.IsNullOrEmpty(SearchText) || entry.Message.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
     }
 
@@ -541,14 +643,19 @@ public partial class MainViewModel : ObservableObject
         var startTime = GetEffectiveStartTime();
         var endTime = GetEffectiveEndTime();
         var sourceName = SelectedSource == null || SelectedSource.IsAllSources ? null : SelectedSource.Name;
+        var processId = SelectedProcess == null || SelectedProcess.IsAllSources ? null : SelectedProcess.Name;
+        var userName = SelectedUser == null || SelectedUser.IsAllSources ? null : SelectedUser.Name;
+        var computer = SelectedComputer == null || SelectedComputer.IsAllSources ? null : SelectedComputer.Name;
 
         var filtered = EventLogService.Instance.FilterEvents(
             sourceName,
             SelectedType?.Level,
             startTime,
             endTime,
-            null,
-            SearchText
+            userName,
+            SearchText,
+            processId,
+            computer
         );
 
         FilteredEvents.Clear();
