@@ -25,6 +25,7 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <CommandBar Grid.Column="0" DefaultLabelPosition="Right" HorizontalAlignment="Left" Background="Transparent">
+                <AppBarButton Icon="Admin" Label="Load Local Event Log" Click="LoadLocalEventLog_Click" />
                 <AppBarButton Icon="Refresh" Label="Refresh" Click="RefreshButton_Click" />
                 <AppBarSeparator />
                 <AppBarButton Icon="OpenFile" Label="Load EVTX" Click="LoadEvtxFile_Click" />
