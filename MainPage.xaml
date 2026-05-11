@@ -178,7 +178,21 @@
                 <Border Grid.Row="0" Background="{ThemeResource LayerFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1" CornerRadius="8">
-                    <tkcontrols:DataGrid x:Name="EventsDataGrid"
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Padding="8,4">
+                            <Button Click="ColumnsButton_Click" Padding="6" Background="Transparent" BorderThickness="0"
+                                    ToolTipService.ToolTip="Show/hide columns">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <FontIcon Glyph="&#xE71D;" FontSize="13" />
+                                    <TextBlock Text="Columns" FontSize="12" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                        <tkcontrols:DataGrid Grid.Row="1" x:Name="EventsDataGrid"
                                           ItemsSource="{x:Bind ViewModel.FilteredEvents, Mode=OneWay}"
                                           SelectedItem="{x:Bind ViewModel.SelectedEvent, Mode=TwoWay}"
                                           AutoGenerateColumns="False"
@@ -214,6 +228,7 @@
                             </tkcontrols:DataGridTemplateColumn>
                         </tkcontrols:DataGrid.Columns>
                     </tkcontrols:DataGrid>
+                    </Grid>
                 </Border>
 
                 <!-- Vertical grid splitter between events and details -->
@@ -306,6 +321,20 @@
                                         <Button Grid.Column="2" Click="CopyDetailField_Click" Padding="4" Background="Transparent" BorderThickness="0"
                                                 ToolTipService.ToolTip="Copy"
                                                 Tag="{x:Bind ViewModel.SelectedEvent.ProviderName, Mode=OneWay}">
+                                            <FontIcon Glyph="&#xE8C8;" FontSize="11" />
+                                        </Button>
+                                    </Grid>
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="120" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Provider GUID:" FontWeight="SemiBold" />
+                                        <TextBlock Grid.Column="1" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.ProviderGuid, Mode=OneWay}" FontFamily="Consolas" />
+                                        <Button Grid.Column="2" Click="CopyDetailField_Click" Padding="4" Background="Transparent" BorderThickness="0"
+                                                ToolTipService.ToolTip="Copy"
+                                                Tag="{x:Bind ViewModel.SelectedEvent.ProviderGuid, Mode=OneWay}">
                                             <FontIcon Glyph="&#xE8C8;" FontSize="11" />
                                         </Button>
                                     </Grid>
