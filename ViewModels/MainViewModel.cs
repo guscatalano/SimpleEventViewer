@@ -34,6 +34,8 @@ public partial class MainViewModel : ObservableObject
     private DateTime _loadedSinceTime = DateTime.MinValue;
     // Whether we currently have any data loaded
     private bool _hasLoadedData = false;
+    private System.Threading.CancellationTokenSource? _prefetchCts;
+    private bool _isPrefetching = false;
 
     public MainViewModel()
     {
@@ -76,7 +78,7 @@ public partial class MainViewModel : ObservableObject
         // Background thread: just queue the entries - flush timer handles UI updates
         EventLogService.Instance.OnEventBatchLoaded += batch =>
         {
-            if (!_isStreaming) return;
+            if (!_isStreaming && !_isPrefetching) return;
 
             foreach (var entry in batch)
             {
@@ -100,6 +102,59 @@ public partial class MainViewModel : ObservableObject
         _flushTimer.Tick += (s, e) => FlushPendingEvents();
 
         _ = LoadSystemLogsAsync();
+    }
+
+    private void SchedulePrefetch()
+    {
+        CancelPrefetch();
+        var cts = new System.Threading.CancellationTokenSource();
+        _prefetchCts = cts;
+        var olderThan = _loadedSinceTime;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                // Wait a few seconds so the UI is idle before we start pulling more
+                await Task.Delay(TimeSpan.FromSeconds(5), cts.Token);
+
+                if (cts.IsCancellationRequested) return;
+
+                _dispatcherQueue.TryEnqueue(() =>
+                {
+                    _isPrefetching = true;
+                    _flushTimer?.Start();
+                    StatusMessage = $"Prefetching older events in background...";
+                });
+
+                EventLogService.Instance.AppendOlderSystemLogs(olderThan, cts.Token);
+
+                _dispatcherQueue.TryEnqueue(() =>
+                {
+                    FlushPendingEvents();
+                    while (_pendingEvents.Count > 0) FlushPendingEvents();
+
+                    _isPrefetching = false;
+                    if (!cts.IsCancellationRequested)
+                    {
+                        // We now have everything older than _loadedSinceTime, so update it
+                        _loadedSinceTime = DateTime.MinValue;
+                        if (!_isStreaming) _flushTimer?.Stop();
+                        UpdateSourceCategories();
+                        StatusMessage = $"All events loaded ({EventLogService.Instance.Events.Count} total)";
+                    }
+                });
+            }
+            catch (TaskCanceledException) { }
+            catch { }
+        }, cts.Token);
+    }
+
+    private void CancelPrefetch()
+    {
+        _prefetchCts?.Cancel();
+        _prefetchCts = null;
+        _isPrefetching = false;
     }
 
     private void FlushPendingEvents()
@@ -315,6 +370,7 @@ public partial class MainViewModel : ObservableObject
     {
         StatusMessage = "Loading system logs...";
         _isFileSource = false;
+        CancelPrefetch();
         FilteredEvents.Clear();
         SourceCategories.Clear();
         SourceCategories.Add(new SourceCategory { Name = "All Sources", Count = 0, IsAllSources = true });
@@ -377,6 +433,13 @@ public partial class MainViewModel : ObservableObject
                 _hasLoadedData = true;
                 UpdateSourceCategories();
                 StatusMessage = $"Loaded {EventLogService.Instance.Events.Count} events from system";
+
+                // Schedule a background prefetch of older events for instant time-range widening later.
+                // Skip if we already have everything (lookback was null = "All time").
+                if (_loadedSinceTime > DateTime.MinValue)
+                {
+                    SchedulePrefetch();
+                }
             });
         }
         catch (Exception ex)
@@ -510,6 +573,7 @@ public partial class MainViewModel : ObservableObject
     {
         StatusMessage = $"Loading {fileType} file...";
         _isFileSource = true;
+        CancelPrefetch();
 
         // Default to "All time" when loading a file - the file's events likely aren't in the last 24h
         var allTime = LoadWindows.FirstOrDefault(w => w.Lookback == null && !w.IsCustom);
