@@ -251,6 +251,42 @@ public sealed partial class MainPage : Page
     private static readonly LevelToRowBrushConverter _rowBrushConverter = new();
     private static readonly SolidColorBrush _transparentBrush = new(Microsoft.UI.Colors.Transparent);
 
+    private void EventsDataGrid_Sorting(object? sender, DataGridColumnEventArgs e)
+    {
+        var current = e.Column.SortDirection;
+        var newDirection = current == DataGridSortDirection.Ascending
+            ? DataGridSortDirection.Descending
+            : DataGridSortDirection.Ascending;
+
+        foreach (var col in EventsDataGrid.Columns)
+        {
+            if (col != e.Column) col.SortDirection = null;
+        }
+        e.Column.SortDirection = newDirection;
+
+        var tag = e.Column.Tag?.ToString() ?? "Time";
+        Func<EventLogEntry, object> keySelector = tag switch
+        {
+            "Time" => entry => entry.TimeCreated,
+            "Level" => entry => (int)entry.Level,
+            "Id" => entry => entry.Id,
+            "Source" => entry => entry.ProviderName,
+            "User" => entry => entry.Username,
+            "Message" => entry => entry.Message,
+            _ => entry => entry.TimeCreated
+        };
+
+        var sorted = newDirection == DataGridSortDirection.Ascending
+            ? ViewModel.FilteredEvents.OrderBy(keySelector).ToList()
+            : ViewModel.FilteredEvents.OrderByDescending(keySelector).ToList();
+
+        ViewModel.FilteredEvents.Clear();
+        foreach (var entry in sorted)
+        {
+            ViewModel.FilteredEvents.Add(entry);
+        }
+    }
+
     private void EventsDataGrid_LoadingRow(object? sender, DataGridRowEventArgs e)
     {
         if (e.Row.DataContext is EventLogEntry entry)
@@ -330,10 +366,17 @@ public sealed partial class MainPage : Page
 
     private void CopyDetailField_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is FrameworkElement fe && fe.Tag is string text)
+        if (sender is FrameworkElement fe && fe.Tag != null)
         {
-            SetClipboard(text);
+            SetClipboard(fe.Tag.ToString() ?? "");
         }
+    }
+
+    private void CopyProcessThread_Click(object sender, RoutedEventArgs e)
+    {
+        var entry = ViewModel.SelectedEvent;
+        if (entry == null) return;
+        SetClipboard($"{entry.ProcessId} / {entry.ThreadId}");
     }
 
     private void CopyAllDetails_Click(object sender, RoutedEventArgs e)

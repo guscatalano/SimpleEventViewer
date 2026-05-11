@@ -191,14 +191,15 @@
                                           IsReadOnly="True"
                                           RowBackground="Transparent"
                                           RightTapped="EventsDataGrid_RightTapped"
+                                          Sorting="EventsDataGrid_Sorting"
                                           LoadingRow="EventsDataGrid_LoadingRow">
                         <tkcontrols:DataGrid.Columns>
-                            <tkcontrols:DataGridTextColumn Header="Time" Binding="{Binding TimeCreatedDisplay}" Width="160" />
-                            <tkcontrols:DataGridTextColumn Header="Level" Binding="{Binding LevelName}" Width="100" />
-                            <tkcontrols:DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="60" />
-                            <tkcontrols:DataGridTextColumn Header="Source" Binding="{Binding ProviderName}" Width="180" />
-                            <tkcontrols:DataGridTextColumn Header="User" Binding="{Binding Username}" Width="120" />
-                            <tkcontrols:DataGridTemplateColumn Header="Message" Width="*">
+                            <tkcontrols:DataGridTextColumn Header="Time" Tag="Time" Binding="{Binding TimeCreatedDisplay}" Width="160" />
+                            <tkcontrols:DataGridTextColumn Header="Level" Tag="Level" Binding="{Binding LevelName}" Width="100" />
+                            <tkcontrols:DataGridTextColumn Header="ID" Tag="Id" Binding="{Binding Id}" Width="60" />
+                            <tkcontrols:DataGridTextColumn Header="Source" Tag="Source" Binding="{Binding ProviderName}" Width="180" />
+                            <tkcontrols:DataGridTextColumn Header="User" Tag="User" Binding="{Binding Username}" Width="120" />
+                            <tkcontrols:DataGridTemplateColumn Header="Message" Tag="Message" Width="*">
                                 <tkcontrols:DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding Message}"
@@ -256,80 +257,140 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="120" />
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Event ID:" FontWeight="SemiBold" />
                                         <TextBlock Grid.Column="1" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.Id, Mode=OneWay}" />
+                                        <Button Grid.Column="2" Click="CopyDetailField_Click" Padding="4" Background="Transparent" BorderThickness="0"
+                                                ToolTipService.ToolTip="Copy"
+                                                Tag="{x:Bind ViewModel.SelectedEvent.Id, Mode=OneWay}">
+                                            <FontIcon Glyph="&#xE8C8;" FontSize="11" />
+                                        </Button>
                                     </Grid>
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="120" />
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Level:" FontWeight="SemiBold" />
                                         <TextBlock Grid.Column="1" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.LevelName, Mode=OneWay}" />
+                                        <Button Grid.Column="2" Click="CopyDetailField_Click" Padding="4" Background="Transparent" BorderThickness="0"
+                                                ToolTipService.ToolTip="Copy"
+                                                Tag="{x:Bind ViewModel.SelectedEvent.LevelName, Mode=OneWay}">
+                                            <FontIcon Glyph="&#xE8C8;" FontSize="11" />
+                                        </Button>
                                     </Grid>
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="120" />
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Time Created:" FontWeight="SemiBold" />
                                         <TextBlock Grid.Column="1" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.TimeCreatedDisplay, Mode=OneWay}" />
+                                        <Button Grid.Column="2" Click="CopyDetailField_Click" Padding="4" Background="Transparent" BorderThickness="0"
+                                                ToolTipService.ToolTip="Copy"
+                                                Tag="{x:Bind ViewModel.SelectedEvent.TimeCreatedDisplay, Mode=OneWay}">
+                                            <FontIcon Glyph="&#xE8C8;" FontSize="11" />
+                                        </Button>
                                     </Grid>
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="120" />
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Provider:" FontWeight="SemiBold" />
                                         <TextBlock Grid.Column="1" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.ProviderName, Mode=OneWay}" TextWrapping="Wrap" />
+                                        <Button Grid.Column="2" Click="CopyDetailField_Click" Padding="4" Background="Transparent" BorderThickness="0"
+                                                ToolTipService.ToolTip="Copy"
+                                                Tag="{x:Bind ViewModel.SelectedEvent.ProviderName, Mode=OneWay}">
+                                            <FontIcon Glyph="&#xE8C8;" FontSize="11" />
+                                        </Button>
                                     </Grid>
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="120" />
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Task:" FontWeight="SemiBold" />
                                         <TextBlock Grid.Column="1" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.TaskName, Mode=OneWay}" />
+                                        <Button Grid.Column="2" Click="CopyDetailField_Click" Padding="4" Background="Transparent" BorderThickness="0"
+                                                ToolTipService.ToolTip="Copy"
+                                                Tag="{x:Bind ViewModel.SelectedEvent.TaskName, Mode=OneWay}">
+                                            <FontIcon Glyph="&#xE8C8;" FontSize="11" />
+                                        </Button>
                                     </Grid>
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="120" />
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Keywords:" FontWeight="SemiBold" />
                                         <TextBlock Grid.Column="1" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.Keywords, Mode=OneWay}" />
+                                        <Button Grid.Column="2" Click="CopyDetailField_Click" Padding="4" Background="Transparent" BorderThickness="0"
+                                                ToolTipService.ToolTip="Copy"
+                                                Tag="{x:Bind ViewModel.SelectedEvent.Keywords, Mode=OneWay}">
+                                            <FontIcon Glyph="&#xE8C8;" FontSize="11" />
+                                        </Button>
                                     </Grid>
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="120" />
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="User:" FontWeight="SemiBold" />
                                         <TextBlock Grid.Column="1" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.Username, Mode=OneWay}" />
+                                        <Button Grid.Column="2" Click="CopyDetailField_Click" Padding="4" Background="Transparent" BorderThickness="0"
+                                                ToolTipService.ToolTip="Copy"
+                                                Tag="{x:Bind ViewModel.SelectedEvent.Username, Mode=OneWay}">
+                                            <FontIcon Glyph="&#xE8C8;" FontSize="11" />
+                                        </Button>
                                     </Grid>
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="120" />
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Process / Thread:" FontWeight="SemiBold" />
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                                            <TextBlock Text="{x:Bind ViewModel.SelectedEvent.ProcessId, Mode=OneWay}" />
+                                            <TextBlock Text="{x:Bind ViewModel.SelectedEvent.ProcessId, Mode=OneWay}" IsTextSelectionEnabled="True" />
                                             <TextBlock Text="/" />
-                                            <TextBlock Text="{x:Bind ViewModel.SelectedEvent.ThreadId, Mode=OneWay}" />
+                                            <TextBlock Text="{x:Bind ViewModel.SelectedEvent.ThreadId, Mode=OneWay}" IsTextSelectionEnabled="True" />
                                         </StackPanel>
+                                        <Button Grid.Column="2" Click="CopyProcessThread_Click" Padding="4" Background="Transparent" BorderThickness="0"
+                                                ToolTipService.ToolTip="Copy">
+                                            <FontIcon Glyph="&#xE8C8;" FontSize="11" />
+                                        </Button>
                                     </Grid>
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="120" />
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Computer:" FontWeight="SemiBold" />
                                         <TextBlock Grid.Column="1" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.Computer, Mode=OneWay}" />
+                                        <Button Grid.Column="2" Click="CopyDetailField_Click" Padding="4" Background="Transparent" BorderThickness="0"
+                                                ToolTipService.ToolTip="Copy"
+                                                Tag="{x:Bind ViewModel.SelectedEvent.Computer, Mode=OneWay}">
+                                            <FontIcon Glyph="&#xE8C8;" FontSize="11" />
+                                        </Button>
                                     </Grid>
                                     <StackPanel Spacing="6" Margin="0,4,0,0">
-                                        <TextBlock Text="Message:" FontWeight="SemiBold" />
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock Text="Message:" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <Button Click="CopyDetailField_Click" Padding="4" Background="Transparent" BorderThickness="0"
+                                                    ToolTipService.ToolTip="Copy"
+                                                    Tag="{x:Bind ViewModel.SelectedEvent.Message, Mode=OneWay}">
+                                                <FontIcon Glyph="&#xE8C8;" FontSize="11" />
+                                            </Button>
+                                        </StackPanel>
                                         <TextBlock Text="{x:Bind ViewModel.SelectedEvent.Message, Mode=OneWay}" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
                                     </StackPanel>
                                     <Expander Header="XML View" HorizontalAlignment="Stretch" Margin="0,8,0,0">
