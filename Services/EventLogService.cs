@@ -177,32 +177,8 @@ public class EventLogService
 
     public void LoadEtlFile(string filePath)
     {
-        _events.Clear();
-        _sourceCounts.Clear();
-        _processCounts.Clear();
-        _userCounts.Clear();
-        _computerCounts.Clear();
-        _channelCounts.Clear();
-
-        var psi = new System.Diagnostics.ProcessStartInfo
-        {
-            FileName = "wevtutil",
-            Arguments = $"qe \"{filePath}\" /f:xml /c:* /rd:true",
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true
-        };
-
-        try
-        {
-            using var process = System.Diagnostics.Process.Start(psi);
-            if (process != null)
-            {
-                var output = process.StandardOutput.ReadToEnd();
-                ParseEvtxXmlOutput(output);
-            }
-        }
-        catch { }
+        // EventLogReader handles .etl files too via PathType.FilePath
+        LoadFileViaEventLogReader(filePath);
     }
 
     public void LoadXmlFile(string filePath)
@@ -216,28 +192,66 @@ public class EventLogService
 
         var xmlContent = File.ReadAllText(filePath);
 
-        if (xmlContent.Contains("<Event>"))
-        {
-            var doc = new XmlDocument();
-            doc.LoadXml(xmlContent);
+        var doc = new XmlDocument();
 
-            var events = doc.SelectNodes("//Event");
-            if (events != null)
+        // Wrap a single-event document so SelectNodes works uniformly
+        if (!xmlContent.TrimStart().StartsWith("<Events", StringComparison.OrdinalIgnoreCase))
+        {
+            // Strip XML declaration if present so we can wrap
+            var content = xmlContent;
+            if (content.TrimStart().StartsWith("<?xml"))
             {
-                foreach (XmlNode node in events)
+                var endDecl = content.IndexOf("?>");
+                if (endDecl >= 0) content = content.Substring(endDecl + 2);
+            }
+            xmlContent = $"<Events>{content}</Events>";
+        }
+
+        doc.LoadXml(xmlContent);
+
+        // Handle the default namespace from the Microsoft event schema
+        var nsmgr = new XmlNamespaceManager(doc.NameTable);
+        nsmgr.AddNamespace("e", "http://schemas.microsoft.com/win/2004/08/events/event");
+
+        var events = doc.SelectNodes("//e:Event", nsmgr);
+        if (events == null || events.Count == 0)
+        {
+            // Try without namespace
+            events = doc.SelectNodes("//Event");
+        }
+
+        if (events != null)
+        {
+            const int batchSize = 100;
+            var batch = new List<EventLogEntry>(batchSize);
+
+            foreach (XmlNode node in events)
+            {
+                var entry = ParseEventXmlNode(node);
+                if (entry != null)
                 {
-                    var entry = ParseEventXmlNode(node);
-                    if (entry != null)
+                    _events.Add(entry);
+                    batch.Add(entry);
+                    TrackCounts(entry);
+
+                    if (batch.Count >= batchSize)
                     {
-                        _events.Add(entry);
-                        TrackCounts(entry);
+                        OnEventBatchLoaded?.Invoke(batch);
+                        batch = new List<EventLogEntry>(batchSize);
                     }
                 }
             }
+
+            if (batch.Count > 0)
+            {
+                OnEventBatchLoaded?.Invoke(batch);
+            }
         }
+
+        OnLoadComplete?.Invoke();
     }
 
-    public void LoadEvtxFile(string filePath)
+    private void LoadFileViaEventLogReader(string filePath)
     {
         _events.Clear();
         _sourceCounts.Clear();
@@ -246,7 +260,6 @@ public class EventLogService
         _computerCounts.Clear();
         _channelCounts.Clear();
 
-        // Use EventLogReader directly - it can read .evtx files natively
         var query = new EventLogQuery(filePath, PathType.FilePath, "*")
         {
             ReverseDirection = true
@@ -284,6 +297,11 @@ public class EventLogService
         }
 
         OnLoadComplete?.Invoke();
+    }
+
+    public void LoadEvtxFile(string filePath)
+    {
+        LoadFileViaEventLogReader(filePath);
     }
 
     public List<EventLogEntry> FilterEvents(

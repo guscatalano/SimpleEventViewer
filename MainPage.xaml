@@ -455,6 +455,15 @@
                                     </Expander>
                                 </StackPanel>
                             </Grid>
+
+                            <!-- Placeholder when no event is selected -->
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        Spacing="8" Margin="0,40,0,0"
+                                        Visibility="{x:Bind ViewModel.SelectedEvent, Mode=OneWay, Converter={StaticResource NullToVisibleConverter}}">
+                                <FontIcon Glyph="&#xE946;" FontSize="32" Opacity="0.4" />
+                                <TextBlock Text="Click an event above to see its details"
+                                           Opacity="0.6" HorizontalAlignment="Center" />
+                            </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
                     </Grid>

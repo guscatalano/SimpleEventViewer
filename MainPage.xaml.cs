@@ -173,20 +173,31 @@ public sealed partial class MainPage : Page
 
     private async System.Threading.Tasks.Task<string?> PickFileAsync(string extension)
     {
-        var picker = new FileOpenPicker();
-        var window = (Application.Current as App)?.MainWindow;
-        if (window != null)
+        try
         {
+            var picker = new FileOpenPicker();
+            var window = (Application.Current as App)?.MainWindow;
+            if (window == null)
+            {
+                ViewModel.StatusMessage = "Error: main window not found";
+                return null;
+            }
+
             var hwnd = WindowNative.GetWindowHandle(window);
             InitializeWithWindow.Initialize(picker, hwnd);
+
+            picker.FileTypeFilter.Add(extension);
+            picker.SuggestedStartLocation = PickerLocationId.Desktop;
+
+            var file = await picker.PickSingleFileAsync();
+            return file?.Path;
         }
-
-        picker.FileTypeFilter.Add(extension);
-        picker.FileTypeFilter.Add("*");
-        picker.SuggestedStartLocation = PickerLocationId.Desktop;
-
-        var file = await picker.PickSingleFileAsync();
-        return file?.Path;
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage = $"File picker error: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"Picker error: {ex}");
+            return null;
+        }
     }
 
     private void ClearFilters_Click(object sender, RoutedEventArgs e)

@@ -11,6 +11,7 @@
                 <ResourceDictionary Source="ms-appx:///CommunityToolkit.WinUI.UI.Controls.DataGrid/DataGrid/DataGrid.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <local:NullToVisibilityConverter x:Key="NullToVisibilityConverter" />
+            <local:NullToVisibleConverter x:Key="NullToVisibleConverter" />
             <local:DateOffsetConverter x:Key="DateOffsetConverter" />
             <local:TimeSpanConverter x:Key="TimeSpanConverter" />
             <local:SingleLineConverter x:Key="SingleLineConverter" />
