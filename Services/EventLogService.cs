@@ -19,14 +19,23 @@ public class EventLogService
 
     private EventLogService() { }
 
+    private static string BuildQuery(TimeSpan? lookback)
+    {
+        if (!lookback.HasValue) return "*";
+
+        // XPath query with time filter - milliseconds since lookback period started
+        var millis = (long)lookback.Value.TotalMilliseconds;
+        return $"*[System[TimeCreated[timediff(@SystemTime) <= {millis}]]]";
+    }
+
     public event Action<int>? OnEventsLoaded;
     public event Action<List<EventLogEntry>>? OnEventBatchLoaded;
     public event Action? OnLoadComplete;
 
-    public int CountSystemEvents()
+    public int CountSystemEvents(TimeSpan? lookback = null)
     {
         var count = 0;
-        var query = new EventLogQuery("Application", PathType.LogName, "*")
+        var query = new EventLogQuery("Application", PathType.LogName, BuildQuery(lookback))
         {
             ReverseDirection = true
         };
@@ -39,12 +48,12 @@ public class EventLogService
         return count;
     }
 
-    public void LoadCurrentSystemLogs()
+    public void LoadCurrentSystemLogs(TimeSpan? lookback = null)
     {
         _events.Clear();
         _sourceCounts.Clear();
 
-        var query = new EventLogQuery("Application", PathType.LogName, "*")
+        var query = new EventLogQuery("Application", PathType.LogName, BuildQuery(lookback))
         {
             ReverseDirection = true
         };
