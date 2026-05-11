@@ -27,8 +27,6 @@ public sealed partial class MainPage : Page
         _rowContextMenu = BuildRowContextMenu();
         InitializeComponent();
 
-        ApplyRowHeight();
-
         // Refresh row colors when theme/color scheme changes
         SettingsService.Instance.ThemeChanged += OnThemeChanged;
     }
@@ -79,7 +77,6 @@ public sealed partial class MainPage : Page
     {
         DispatcherQueue.TryEnqueue(() =>
         {
-            ApplyRowHeight();
             var temp = ViewModel.FilteredEvents.ToList();
             ViewModel.FilteredEvents.Clear();
             foreach (var item in temp)
@@ -87,12 +84,6 @@ public sealed partial class MainPage : Page
                 ViewModel.FilteredEvents.Add(item);
             }
         });
-    }
-
-    private void ApplyRowHeight()
-    {
-        var lines = SettingsService.Instance.MaxRowLines;
-        EventsDataGrid.RowHeight = lines == 2 ? 52 : 32;
     }
 
     private void MessageText_Loaded(object sender, RoutedEventArgs e)
