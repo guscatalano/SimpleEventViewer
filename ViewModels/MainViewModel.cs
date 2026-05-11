@@ -27,6 +27,7 @@ public partial class MainViewModel : ObservableObject
     private ObservableCollection<EventLogEntry> _filteredEvents = new();
     private int _totalEventCount = -1;
     private bool _isStreaming = false;
+    private LoadWindowItem _selectedLoadWindow;
 
     public MainViewModel()
     {
@@ -41,6 +42,16 @@ public partial class MainViewModel : ObservableObject
             new() { Level = LogLevel.Information, Name = "Information" },
             new() { Level = LogLevel.Verbose, Name = "Verbose" }
         };
+
+        LoadWindows = new List<LoadWindowItem>
+        {
+            new() { Name = "Last hour", Lookback = TimeSpan.FromHours(1) },
+            new() { Name = "Last 24 hours", Lookback = TimeSpan.FromDays(1) },
+            new() { Name = "Last 7 days", Lookback = TimeSpan.FromDays(7) },
+            new() { Name = "Last 30 days", Lookback = TimeSpan.FromDays(30) },
+            new() { Name = "All time", Lookback = null }
+        };
+        _selectedLoadWindow = LoadWindows[1]; // default to Last 24 hours
 
         EventLogService.Instance.OnEventsLoaded += count =>
         {
@@ -207,6 +218,19 @@ public partial class MainViewModel : ObservableObject
     }
 
     public IReadOnlyList<EventTypeItem> AvailableTypes { get; }
+    public IReadOnlyList<LoadWindowItem> LoadWindows { get; }
+
+    public LoadWindowItem SelectedLoadWindow
+    {
+        get => _selectedLoadWindow;
+        set
+        {
+            if (SetProperty(ref _selectedLoadWindow, value))
+            {
+                _ = LoadSystemLogsAsync();
+            }
+        }
+    }
 
     private async Task LoadSystemLogsAsync()
     {
@@ -222,12 +246,14 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
+            var lookback = _selectedLoadWindow.Lookback;
+
             // Kick off count in parallel
             _ = Task.Run(() =>
             {
                 try
                 {
-                    var count = EventLogService.Instance.CountSystemEvents();
+                    var count = EventLogService.Instance.CountSystemEvents(lookback);
                     _totalEventCount = count;
                 }
                 catch { }
@@ -237,7 +263,7 @@ public partial class MainViewModel : ObservableObject
             _isStreaming = true;
             _flushTimer?.Start();
 
-            await Task.Run(() => EventLogService.Instance.LoadCurrentSystemLogs());
+            await Task.Run(() => EventLogService.Instance.LoadCurrentSystemLogs(lookback));
 
             _dispatcherQueue.TryEnqueue(() =>
             {
@@ -399,4 +425,10 @@ public class EventTypeItem
 {
     public LogLevel? Level { get; set; }
     public string Name { get; set; } = string.Empty;
+}
+
+public class LoadWindowItem
+{
+    public string Name { get; set; } = string.Empty;
+    public TimeSpan? Lookback { get; set; }
 }
