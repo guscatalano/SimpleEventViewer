@@ -19,23 +19,35 @@ public class EventLogService
 
     private EventLogService() { }
 
-    private static string BuildQuery(TimeSpan? lookback)
+    private static string BuildQuery(TimeSpan? lookback, DateTime? start = null, DateTime? end = null)
     {
-        if (!lookback.HasValue) return "*";
+        if (lookback.HasValue)
+        {
+            var millis = (long)lookback.Value.TotalMilliseconds;
+            return $"*[System[TimeCreated[timediff(@SystemTime) <= {millis}]]]";
+        }
 
-        // XPath query with time filter - milliseconds since lookback period started
-        var millis = (long)lookback.Value.TotalMilliseconds;
-        return $"*[System[TimeCreated[timediff(@SystemTime) <= {millis}]]]";
+        if (start.HasValue || end.HasValue)
+        {
+            var conditions = new List<string>();
+            if (start.HasValue)
+                conditions.Add($"@SystemTime>='{start.Value.ToUniversalTime():o}'");
+            if (end.HasValue)
+                conditions.Add($"@SystemTime<='{end.Value.ToUniversalTime():o}'");
+            return $"*[System[TimeCreated[{string.Join(" and ", conditions)}]]]";
+        }
+
+        return "*";
     }
 
     public event Action<int>? OnEventsLoaded;
     public event Action<List<EventLogEntry>>? OnEventBatchLoaded;
     public event Action? OnLoadComplete;
 
-    public int CountSystemEvents(TimeSpan? lookback = null)
+    public int CountSystemEvents(TimeSpan? lookback = null, DateTime? start = null, DateTime? end = null)
     {
         var count = 0;
-        var query = new EventLogQuery("Application", PathType.LogName, BuildQuery(lookback))
+        var query = new EventLogQuery("Application", PathType.LogName, BuildQuery(lookback, start, end))
         {
             ReverseDirection = true
         };
@@ -48,12 +60,12 @@ public class EventLogService
         return count;
     }
 
-    public void LoadCurrentSystemLogs(TimeSpan? lookback = null)
+    public void LoadCurrentSystemLogs(TimeSpan? lookback = null, DateTime? start = null, DateTime? end = null)
     {
         _events.Clear();
         _sourceCounts.Clear();
 
-        var query = new EventLogQuery("Application", PathType.LogName, BuildQuery(lookback))
+        var query = new EventLogQuery("Application", PathType.LogName, BuildQuery(lookback, start, end))
         {
             ReverseDirection = true
         };

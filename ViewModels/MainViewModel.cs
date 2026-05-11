@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
 
 namespace SimpleEventViewer_WinUI.ViewModels;
 
@@ -28,6 +29,7 @@ public partial class MainViewModel : ObservableObject
     private int _totalEventCount = -1;
     private bool _isStreaming = false;
     private LoadWindowItem _selectedLoadWindow;
+    private bool _isFileSource = false;
 
     public MainViewModel()
     {
@@ -49,7 +51,8 @@ public partial class MainViewModel : ObservableObject
             new() { Name = "Last 24 hours", Lookback = TimeSpan.FromDays(1) },
             new() { Name = "Last 7 days", Lookback = TimeSpan.FromDays(7) },
             new() { Name = "Last 30 days", Lookback = TimeSpan.FromDays(30) },
-            new() { Name = "All time", Lookback = null }
+            new() { Name = "All time", Lookback = null },
+            new() { Name = "Custom range...", IsCustom = true }
         };
         _selectedLoadWindow = LoadWindows[1]; // default to Last 24 hours
 
@@ -158,7 +161,7 @@ public partial class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _startTime, value))
             {
-                ApplyFilters();
+                OnTimeRangeChanged();
             }
         }
     }
@@ -170,7 +173,7 @@ public partial class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _endTime, value))
             {
-                ApplyFilters();
+                OnTimeRangeChanged();
             }
         }
     }
@@ -182,7 +185,7 @@ public partial class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _startTimeOfDay, value))
             {
-                ApplyFilters();
+                OnTimeRangeChanged();
             }
         }
     }
@@ -194,8 +197,22 @@ public partial class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _endTimeOfDay, value))
             {
-                ApplyFilters();
+                OnTimeRangeChanged();
             }
+        }
+    }
+
+    private void OnTimeRangeChanged()
+    {
+        // For file sources, never reload - just filter the existing data.
+        // For live system logs in Custom mode, reload with the new range.
+        if (!_isFileSource && _selectedLoadWindow.IsCustom)
+        {
+            _ = LoadSystemLogsAsync();
+        }
+        else
+        {
+            ApplyFilters();
         }
     }
 
@@ -227,14 +244,27 @@ public partial class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _selectedLoadWindow, value))
             {
-                _ = LoadSystemLogsAsync();
+                OnPropertyChanged(nameof(IsCustomRange));
+                // For live system logs, changing the preset reloads from source.
+                // For file sources, the file is already loaded - just filter the display.
+                if (_isFileSource)
+                {
+                    ApplyFilters();
+                }
+                else
+                {
+                    _ = LoadSystemLogsAsync();
+                }
             }
         }
     }
 
+    public Visibility IsCustomRange => _selectedLoadWindow.IsCustom ? Visibility.Visible : Visibility.Collapsed;
+
     private async Task LoadSystemLogsAsync()
     {
         StatusMessage = "Loading system logs...";
+        _isFileSource = false;
         FilteredEvents.Clear();
         SourceCategories.Clear();
         SourceCategories.Add(new SourceCategory { Name = "All Sources", Count = 0, IsAllSources = true });
@@ -246,14 +276,23 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
-            var lookback = _selectedLoadWindow.Lookback;
+            DateTime? customStart = null;
+            DateTime? customEnd = null;
+            TimeSpan? lookback = _selectedLoadWindow.Lookback;
+
+            if (_selectedLoadWindow.IsCustom)
+            {
+                if (StartTime.HasValue) customStart = StartTime.Value.Date + StartTimeOfDay;
+                if (EndTime.HasValue) customEnd = EndTime.Value.Date + EndTimeOfDay;
+                lookback = null;
+            }
 
             // Kick off count in parallel
             _ = Task.Run(() =>
             {
                 try
                 {
-                    var count = EventLogService.Instance.CountSystemEvents(lookback);
+                    var count = EventLogService.Instance.CountSystemEvents(lookback, customStart, customEnd);
                     _totalEventCount = count;
                 }
                 catch { }
@@ -263,7 +302,7 @@ public partial class MainViewModel : ObservableObject
             _isStreaming = true;
             _flushTimer?.Start();
 
-            await Task.Run(() => EventLogService.Instance.LoadCurrentSystemLogs(lookback));
+            await Task.Run(() => EventLogService.Instance.LoadCurrentSystemLogs(lookback, customStart, customEnd));
 
             _dispatcherQueue.TryEnqueue(() =>
             {
@@ -326,14 +365,38 @@ public partial class MainViewModel : ObservableObject
 
     private DateTime GetEffectiveStartTime()
     {
-        if (!StartTime.HasValue) return DateTime.MinValue;
-        return StartTime.Value.Date + StartTimeOfDay;
+        if (_selectedLoadWindow.IsCustom)
+        {
+            if (!StartTime.HasValue) return DateTime.MinValue;
+            return StartTime.Value.Date + StartTimeOfDay;
+        }
+
+        if (_selectedLoadWindow.Lookback.HasValue)
+        {
+            // For file sources, anchor relative to the newest event so presets are useful
+            // For live data, the lookback is already applied at load time, so this is a no-op
+            var reference = _isFileSource ? GetNewestEventTime() : DateTime.Now;
+            return reference - _selectedLoadWindow.Lookback.Value;
+        }
+
+        return DateTime.MinValue; // "All time"
     }
 
     private DateTime GetEffectiveEndTime()
     {
-        if (!EndTime.HasValue) return DateTime.MaxValue;
-        return EndTime.Value.Date + EndTimeOfDay;
+        if (_selectedLoadWindow.IsCustom)
+        {
+            if (!EndTime.HasValue) return DateTime.MaxValue;
+            return EndTime.Value.Date + EndTimeOfDay;
+        }
+
+        return DateTime.MaxValue;
+    }
+
+    private DateTime GetNewestEventTime()
+    {
+        var events = EventLogService.Instance.Events;
+        return events.Count > 0 ? events[0].TimeCreated : DateTime.Now;
     }
 
     private bool MatchesFilters(EventLogEntry entry)
@@ -374,6 +437,7 @@ public partial class MainViewModel : ObservableObject
 
     public void RefreshCurrentView()
     {
+        _isFileSource = false;
         _ = LoadSystemLogsAsync();
     }
 
@@ -385,6 +449,17 @@ public partial class MainViewModel : ObservableObject
     private async Task LoadFileAsync(string filePath, string fileType)
     {
         StatusMessage = $"Loading {fileType} file...";
+        _isFileSource = true;
+
+        // Default to "All time" when loading a file - the file's events likely aren't in the last 24h
+        var allTime = LoadWindows.FirstOrDefault(w => w.Lookback == null && !w.IsCustom);
+        if (allTime != null && _selectedLoadWindow != allTime)
+        {
+            // Set the field directly to avoid triggering reload
+            _selectedLoadWindow = allTime;
+            OnPropertyChanged(nameof(SelectedLoadWindow));
+            OnPropertyChanged(nameof(IsCustomRange));
+        }
 
         try
         {
@@ -431,4 +506,5 @@ public class LoadWindowItem
 {
     public string Name { get; set; } = string.Empty;
     public TimeSpan? Lookback { get; set; }
+    public bool IsCustom { get; set; }
 }

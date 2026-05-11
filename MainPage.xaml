@@ -24,22 +24,13 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <CommandBar DefaultLabelPosition="Right" HorizontalAlignment="Left" Background="Transparent">
-                    <AppBarButton Icon="Refresh" Label="Refresh" Click="RefreshButton_Click" />
-                    <AppBarSeparator />
-                    <AppBarButton Icon="OpenFile" Label="Load EVTX" Click="LoadEvtxFile_Click" />
-                    <AppBarButton Icon="OpenFile" Label="Load XML" Click="LoadXmlFile_Click" />
-                    <AppBarButton Icon="OpenFile" Label="Load ETL" Click="LoadEtlFile_Click" />
-                </CommandBar>
-                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="12,0,0,0">
-                    <TextBlock Text="Load:" VerticalAlignment="Center" Opacity="0.7" />
-                    <ComboBox ItemsSource="{x:Bind ViewModel.LoadWindows, Mode=OneWay}"
-                              SelectedItem="{x:Bind ViewModel.SelectedLoadWindow, Mode=TwoWay}"
-                              DisplayMemberPath="Name"
-                              MinWidth="140" />
-                </StackPanel>
-            </StackPanel>
+            <CommandBar Grid.Column="0" DefaultLabelPosition="Right" HorizontalAlignment="Left" Background="Transparent">
+                <AppBarButton Icon="Refresh" Label="Refresh" Click="RefreshButton_Click" />
+                <AppBarSeparator />
+                <AppBarButton Icon="OpenFile" Label="Load EVTX" Click="LoadEvtxFile_Click" />
+                <AppBarButton Icon="OpenFile" Label="Load XML" Click="LoadXmlFile_Click" />
+                <AppBarButton Icon="OpenFile" Label="Load ETL" Click="LoadEtlFile_Click" />
+            </CommandBar>
             <Button Grid.Column="1" Click="SettingsButton_Click" Padding="8" VerticalAlignment="Center" Margin="0,0,8,0"
                     ToolTipService.ToolTip="Settings">
                 <FontIcon Glyph="&#xE713;" FontSize="16" />
@@ -104,24 +95,31 @@
 
                             <StackPanel Spacing="6">
                                 <TextBlock Text="Time Range" FontWeight="SemiBold" FontSize="13" />
-                                <TextBlock Text="From" Opacity="0.7" FontSize="11" />
-                                <CalendarDatePicker x:Name="StartDatePicker"
-                                                    PlaceholderText="Date"
-                                                    Date="{x:Bind ViewModel.StartTime, Mode=TwoWay, Converter={StaticResource DateOffsetConverter}}"
-                                                    HorizontalAlignment="Stretch" />
-                                <TimePicker x:Name="StartTimePicker"
-                                            ClockIdentifier="24HourClock"
-                                            SelectedTime="{x:Bind ViewModel.StartTimeOfDay, Mode=TwoWay, Converter={StaticResource TimeSpanConverter}}"
-                                            HorizontalAlignment="Stretch" />
-                                <TextBlock Text="To" Opacity="0.7" FontSize="11" Margin="0,4,0,0" />
-                                <CalendarDatePicker x:Name="EndDatePicker"
-                                                    PlaceholderText="Date"
-                                                    Date="{x:Bind ViewModel.EndTime, Mode=TwoWay, Converter={StaticResource DateOffsetConverter}}"
-                                                    HorizontalAlignment="Stretch" />
-                                <TimePicker x:Name="EndTimePicker"
-                                            ClockIdentifier="24HourClock"
-                                            SelectedTime="{x:Bind ViewModel.EndTimeOfDay, Mode=TwoWay, Converter={StaticResource TimeSpanConverter}}"
-                                            HorizontalAlignment="Stretch" />
+                                <ComboBox ItemsSource="{x:Bind ViewModel.LoadWindows, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedLoadWindow, Mode=TwoWay}"
+                                          DisplayMemberPath="Name"
+                                          HorizontalAlignment="Stretch" />
+                                <StackPanel Spacing="6" Margin="0,4,0,0"
+                                            Visibility="{x:Bind ViewModel.IsCustomRange, Mode=OneWay}">
+                                    <TextBlock Text="From" Opacity="0.7" FontSize="11" />
+                                    <CalendarDatePicker x:Name="StartDatePicker"
+                                                        PlaceholderText="Date"
+                                                        Date="{x:Bind ViewModel.StartTime, Mode=TwoWay, Converter={StaticResource DateOffsetConverter}}"
+                                                        HorizontalAlignment="Stretch" />
+                                    <TimePicker x:Name="StartTimePicker"
+                                                ClockIdentifier="24HourClock"
+                                                SelectedTime="{x:Bind ViewModel.StartTimeOfDay, Mode=TwoWay, Converter={StaticResource TimeSpanConverter}}"
+                                                HorizontalAlignment="Stretch" />
+                                    <TextBlock Text="To" Opacity="0.7" FontSize="11" Margin="0,4,0,0" />
+                                    <CalendarDatePicker x:Name="EndDatePicker"
+                                                        PlaceholderText="Date"
+                                                        Date="{x:Bind ViewModel.EndTime, Mode=TwoWay, Converter={StaticResource DateOffsetConverter}}"
+                                                        HorizontalAlignment="Stretch" />
+                                    <TimePicker x:Name="EndTimePicker"
+                                                ClockIdentifier="24HourClock"
+                                                SelectedTime="{x:Bind ViewModel.EndTimeOfDay, Mode=TwoWay, Converter={StaticResource TimeSpanConverter}}"
+                                                HorizontalAlignment="Stretch" />
+                                </StackPanel>
                             </StackPanel>
 
                             <StackPanel Spacing="6">
