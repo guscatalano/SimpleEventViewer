@@ -123,6 +123,9 @@
                     <TextBlock Text="About" FontSize="18" FontWeight="SemiBold" />
                     <TextBlock Text="Simple Event Viewer" />
                     <TextBlock Text="A modern Windows Event Log viewer built with WinUI 3" Opacity="0.7" FontSize="12" />
+                    <TextBlock Text="" Margin="0,8,0,0" />
+                    <TextBlock Text="Created by Gus Catalano" FontWeight="SemiBold" />
+                    <TextBlock Text="https://github.com/guscatalano" Opacity="0.7" FontSize="12" />
                 </StackPanel>
             </Border>
 

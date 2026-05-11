@@ -20,6 +20,7 @@ public partial class MainViewModel : ObservableObject
     private SourceCategory? _selectedProcess;
     private SourceCategory? _selectedUser;
     private SourceCategory? _selectedComputer;
+    private SourceCategory? _selectedChannel;
     private EventTypeItem _selectedType = null!;
     private DateTimeOffset? _startTime;
     private DateTimeOffset? _endTime;
@@ -31,11 +32,13 @@ public partial class MainViewModel : ObservableObject
     private ObservableCollection<SourceCategory> _processCategories = new();
     private ObservableCollection<SourceCategory> _userCategories = new();
     private ObservableCollection<SourceCategory> _computerCategories = new();
+    private ObservableCollection<SourceCategory> _channelCategories = new();
     private ObservableCollection<EventLogEntry> _filteredEvents = new();
     private int _totalEventCount = -1;
     private bool _isStreaming = false;
     private LoadWindowItem _selectedLoadWindow;
     private bool _isFileSource = false;
+    private string _currentSource = "Live system logs";
     // The earliest time covered by the currently loaded events (DateTime.MinValue means "all time")
     private DateTime _loadedSinceTime = DateTime.MinValue;
     // Whether we currently have any data loaded
@@ -202,6 +205,24 @@ public partial class MainViewModel : ObservableObject
         set => SetProperty(ref _computerCategories, value);
     }
 
+    public ObservableCollection<SourceCategory> ChannelCategories
+    {
+        get => _channelCategories;
+        set => SetProperty(ref _channelCategories, value);
+    }
+
+    public SourceCategory? SelectedChannel
+    {
+        get => _selectedChannel;
+        set
+        {
+            if (SetProperty(ref _selectedChannel, value))
+            {
+                ApplyFilters();
+            }
+        }
+    }
+
     public SourceCategory? SelectedProcess
     {
         get => _selectedProcess;
@@ -248,6 +269,12 @@ public partial class MainViewModel : ObservableObject
     {
         get => _statusMessage;
         set => SetProperty(ref _statusMessage, value);
+    }
+
+    public string CurrentSource
+    {
+        get => _currentSource;
+        set => SetProperty(ref _currentSource, value);
     }
 
     public SourceCategory? SelectedSource
@@ -447,6 +474,12 @@ public partial class MainViewModel : ObservableObject
         ComputerCategories.Clear();
         ComputerCategories.Add(new SourceCategory { Name = "All Computers", Count = 0, IsAllSources = true });
         SelectedComputer = ComputerCategories[0];
+
+        ChannelCategories.Clear();
+        ChannelCategories.Add(new SourceCategory { Name = "All Channels", Count = 0, IsAllSources = true });
+        SelectedChannel = ChannelCategories[0];
+
+        CurrentSource = "Live system logs";
         _totalEventCount = -1;
 
         // Clear any leftover queue
@@ -552,6 +585,12 @@ public partial class MainViewModel : ObservableObject
             EventLogService.Instance.ComputerCounts,
             SelectedComputer?.Name,
             v => SelectedComputer = v);
+
+        RefreshCategoryList(ChannelCategories, "All Channels", totalCount,
+            EventLogService.Instance.GetAvailableChannels(),
+            EventLogService.Instance.ChannelCounts,
+            SelectedChannel?.Name,
+            v => SelectedChannel = v);
     }
 
     private static void RefreshCategoryList(
@@ -626,6 +665,7 @@ public partial class MainViewModel : ObservableObject
         var processId = SelectedProcess == null || SelectedProcess.IsAllSources ? null : SelectedProcess.Name;
         var userName = SelectedUser == null || SelectedUser.IsAllSources ? null : SelectedUser.Name;
         var computer = SelectedComputer == null || SelectedComputer.IsAllSources ? null : SelectedComputer.Name;
+        var channel = SelectedChannel == null || SelectedChannel.IsAllSources ? null : SelectedChannel.Name;
 
         return (string.IsNullOrEmpty(sourceName) || entry.ProviderName == sourceName) &&
                (SelectedType?.Level == null || entry.Level == SelectedType.Level.Value) &&
@@ -634,6 +674,7 @@ public partial class MainViewModel : ObservableObject
                (string.IsNullOrEmpty(processId) || entry.ProcessId.ToString() == processId) &&
                (string.IsNullOrEmpty(userName) || entry.Username == userName) &&
                (string.IsNullOrEmpty(computer) || entry.Computer == computer) &&
+               (string.IsNullOrEmpty(channel) || entry.Channel == channel) &&
                (string.IsNullOrEmpty(SearchText) || entry.Message.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
     }
 
@@ -646,6 +687,7 @@ public partial class MainViewModel : ObservableObject
         var processId = SelectedProcess == null || SelectedProcess.IsAllSources ? null : SelectedProcess.Name;
         var userName = SelectedUser == null || SelectedUser.IsAllSources ? null : SelectedUser.Name;
         var computer = SelectedComputer == null || SelectedComputer.IsAllSources ? null : SelectedComputer.Name;
+        var channel = SelectedChannel == null || SelectedChannel.IsAllSources ? null : SelectedChannel.Name;
 
         var filtered = EventLogService.Instance.FilterEvents(
             sourceName,
@@ -655,7 +697,8 @@ public partial class MainViewModel : ObservableObject
             userName,
             SearchText,
             processId,
-            computer
+            computer,
+            channel
         );
 
         FilteredEvents.Clear();
@@ -680,7 +723,12 @@ public partial class MainViewModel : ObservableObject
     {
         StatusMessage = $"Loading {fileType} file...";
         _isFileSource = true;
+        CurrentSource = System.IO.Path.GetFileName(filePath);
         CancelPrefetch();
+        FilteredEvents.Clear();
+        _isStreaming = true;
+        _flushTimer?.Start();
+        while (_pendingEvents.TryDequeue(out _)) { }
 
         // Default to "All time" when loading a file - the file's events likely aren't in the last 24h
         var allTime = LoadWindows.FirstOrDefault(w => w.Lookback == null && !w.IsCustom);
@@ -712,6 +760,10 @@ public partial class MainViewModel : ObservableObject
 
             _dispatcherQueue.TryEnqueue(() =>
             {
+                FlushPendingEvents();
+                while (_pendingEvents.Count > 0) FlushPendingEvents();
+                _isStreaming = false;
+                _flushTimer?.Stop();
                 UpdateSourceCategories();
                 ApplyFilters();
                 StatusMessage = $"Loaded {EventLogService.Instance.Events.Count} events from {fileType} file";
@@ -719,6 +771,8 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            _isStreaming = false;
+            _flushTimer?.Stop();
             _dispatcherQueue.TryEnqueue(() =>
             {
                 StatusMessage = $"Error: {ex.Message}";

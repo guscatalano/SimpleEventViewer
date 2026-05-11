@@ -16,12 +16,14 @@ public class EventLogService
     private readonly ConcurrentDictionary<string, int> _processCounts = new();
     private readonly ConcurrentDictionary<string, int> _userCounts = new();
     private readonly ConcurrentDictionary<string, int> _computerCounts = new();
+    private readonly ConcurrentDictionary<string, int> _channelCounts = new();
 
     public IReadOnlyList<EventLogEntry> Events => _events.ToList().AsReadOnly();
     public IReadOnlyDictionary<string, int> SourceCounts => _sourceCounts.ToDictionary(k => k.Key, v => v.Value);
     public IReadOnlyDictionary<string, int> ProcessCounts => _processCounts.ToDictionary(k => k.Key, v => v.Value);
     public IReadOnlyDictionary<string, int> UserCounts => _userCounts.ToDictionary(k => k.Key, v => v.Value);
     public IReadOnlyDictionary<string, int> ComputerCounts => _computerCounts.ToDictionary(k => k.Key, v => v.Value);
+    public IReadOnlyDictionary<string, int> ChannelCounts => _channelCounts.ToDictionary(k => k.Key, v => v.Value);
 
     private EventLogService() { }
 
@@ -34,6 +36,8 @@ public class EventLogService
             _userCounts.AddOrUpdate(entry.Username, 1, (k, c) => c + 1);
         if (!string.IsNullOrEmpty(entry.Computer))
             _computerCounts.AddOrUpdate(entry.Computer, 1, (k, c) => c + 1);
+        if (!string.IsNullOrEmpty(entry.Channel))
+            _channelCounts.AddOrUpdate(entry.Channel, 1, (k, c) => c + 1);
     }
 
     private static string BuildQuery(TimeSpan? lookback, DateTime? start = null, DateTime? end = null)
@@ -128,6 +132,7 @@ public class EventLogService
         _processCounts.Clear();
         _userCounts.Clear();
         _computerCounts.Clear();
+        _channelCounts.Clear();
 
         var query = new EventLogQuery("Application", PathType.LogName, BuildQuery(lookback, start, end))
         {
@@ -177,6 +182,7 @@ public class EventLogService
         _processCounts.Clear();
         _userCounts.Clear();
         _computerCounts.Clear();
+        _channelCounts.Clear();
 
         var psi = new System.Diagnostics.ProcessStartInfo
         {
@@ -206,6 +212,7 @@ public class EventLogService
         _processCounts.Clear();
         _userCounts.Clear();
         _computerCounts.Clear();
+        _channelCounts.Clear();
 
         var xmlContent = File.ReadAllText(filePath);
 
@@ -237,26 +244,46 @@ public class EventLogService
         _processCounts.Clear();
         _userCounts.Clear();
         _computerCounts.Clear();
+        _channelCounts.Clear();
 
-        var psi = new System.Diagnostics.ProcessStartInfo
+        // Use EventLogReader directly - it can read .evtx files natively
+        var query = new EventLogQuery(filePath, PathType.FilePath, "*")
         {
-            FileName = "wevtutil",
-            Arguments = $"qe \"{filePath}\" /f:xml /c:* /rd:true",
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true
+            ReverseDirection = true
         };
 
-        try
+        using var reader = new EventLogReader(query);
+
+        const int batchSize = 100;
+        var batch = new List<EventLogEntry>(batchSize);
+
+        while (true)
         {
-            using var process = System.Diagnostics.Process.Start(psi);
-            if (process != null)
+            var entry = reader.ReadEvent();
+            if (entry == null) break;
+
+            var logEntry = ConvertToEntry(entry);
+            if (logEntry != null)
             {
-                var output = process.StandardOutput.ReadToEnd();
-                ParseEvtxXmlOutput(output);
+                logEntry.IsSystemLog = false;
+                _events.Add(logEntry);
+                batch.Add(logEntry);
+                TrackCounts(logEntry);
+
+                if (batch.Count >= batchSize)
+                {
+                    OnEventBatchLoaded?.Invoke(batch);
+                    batch = new List<EventLogEntry>(batchSize);
+                }
             }
         }
-        catch { }
+
+        if (batch.Count > 0)
+        {
+            OnEventBatchLoaded?.Invoke(batch);
+        }
+
+        OnLoadComplete?.Invoke();
     }
 
     public List<EventLogEntry> FilterEvents(
@@ -267,7 +294,8 @@ public class EventLogService
         string? username = null,
         string? searchTerms = null,
         string? processId = null,
-        string? computer = null)
+        string? computer = null,
+        string? channel = null)
     {
         var allEvents = _events.ToList();
         return allEvents.Where(e =>
@@ -278,6 +306,7 @@ public class EventLogService
             (string.IsNullOrEmpty(username) || e.Username == username) &&
             (string.IsNullOrEmpty(processId) || e.ProcessId.ToString() == processId) &&
             (string.IsNullOrEmpty(computer) || e.Computer == computer) &&
+            (string.IsNullOrEmpty(channel) || e.Channel == channel) &&
             (string.IsNullOrEmpty(searchTerms) || e.Message.Contains(searchTerms, StringComparison.OrdinalIgnoreCase))
         ).OrderByDescending(e => e.TimeCreated).ToList();
     }
@@ -286,6 +315,7 @@ public class EventLogService
     public List<string> GetAvailableProcesses() => _processCounts.Keys.OrderBy(k => int.TryParse(k, out var n) ? n : int.MaxValue).ToList();
     public List<string> GetAvailableUsers() => _userCounts.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
     public List<string> GetAvailableComputers() => _computerCounts.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
+    public List<string> GetAvailableChannels() => _channelCounts.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
 
     private EventLogEntry? ConvertToEntry(EventRecord record)
     {
@@ -323,6 +353,7 @@ public class EventLogService
                 TimeCreated = record.TimeCreated ?? DateTime.Now,
                 ProviderName = record.ProviderName ?? "Unknown",
                 ProviderGuid = record.ProviderId?.ToString() ?? string.Empty,
+                Channel = record.LogName ?? string.Empty,
                 TaskName = record.TaskDisplayName ?? string.Empty,
                 Keywords = keywords,
                 Username = username,
@@ -409,6 +440,7 @@ public class EventLogService
             var providerNode = node.SelectSingleNode("System/Provider");
             var provider = providerNode?.Attributes["Name"]?.Value ?? "Unknown";
             var providerGuid = providerNode?.Attributes["Guid"]?.Value ?? string.Empty;
+            var channel = node.SelectSingleNode("System/Channel")?.InnerText ?? string.Empty;
             var task = node.SelectSingleNode("System/Task")?.InnerText ?? string.Empty;
             var keywords = node.SelectSingleNode("System/Keywords")?.InnerText ?? string.Empty;
             var userNode = node.SelectSingleNode("System/Security")?.Attributes["UserID"]?.Value;
@@ -424,6 +456,7 @@ public class EventLogService
                 TimeCreated = DateTime.TryParse(time, out var dt) ? dt : DateTime.Now,
                 ProviderName = provider,
                 ProviderGuid = providerGuid,
+                Channel = channel,
                 TaskName = task,
                 Keywords = keywords,
                 Username = username,

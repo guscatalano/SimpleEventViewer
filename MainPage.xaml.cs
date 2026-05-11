@@ -195,6 +195,7 @@ public sealed partial class MainPage : Page
         ViewModel.SelectedProcess = ViewModel.ProcessCategories.Count > 0 ? ViewModel.ProcessCategories[0] : null;
         ViewModel.SelectedUser = ViewModel.UserCategories.Count > 0 ? ViewModel.UserCategories[0] : null;
         ViewModel.SelectedComputer = ViewModel.ComputerCategories.Count > 0 ? ViewModel.ComputerCategories[0] : null;
+        ViewModel.SelectedChannel = ViewModel.ChannelCategories.Count > 0 ? ViewModel.ChannelCategories[0] : null;
         if (ViewModel.AvailableTypes.Count > 0)
         {
             ViewModel.SelectedType = ViewModel.AvailableTypes[0];
@@ -271,6 +272,7 @@ public sealed partial class MainPage : Page
             "Level" => entry => (int)entry.Level,
             "Id" => entry => entry.Id,
             "Source" => entry => entry.ProviderName,
+            "Channel" => entry => entry.Channel,
             "User" => entry => entry.Username,
             "Message" => entry => entry.Message,
             _ => entry => entry.TimeCreated
@@ -412,6 +414,8 @@ public sealed partial class MainPage : Page
         sb.AppendLine($"Level: {entry.LevelName}");
         sb.AppendLine($"Time Created: {entry.TimeCreatedDisplay}");
         sb.AppendLine($"Provider: {entry.ProviderName}");
+        sb.AppendLine($"Provider GUID: {entry.ProviderGuid}");
+        sb.AppendLine($"Channel: {entry.Channel}");
         sb.AppendLine($"Task: {entry.TaskName}");
         sb.AppendLine($"Keywords: {entry.Keywords}");
         sb.AppendLine($"User: {entry.Username}");
