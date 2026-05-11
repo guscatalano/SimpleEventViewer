@@ -50,7 +50,10 @@ jobs:
             /p:GenerateAppxPackageOnBuild=true `
             /p:AppxPackageSigningEnabled=false `
             /p:UapAppxPackageBuildMode=SideloadOnly `
-            /p:AppxBundle=Never
+            /p:AppxBundle=Never `
+            /p:PublishTrimmed=false `
+            /p:PublishReadyToRun=false `
+            /p:WindowsAppSDKSelfContained=true
 
       - name: Publish for MSI
         run: |
