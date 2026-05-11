@@ -166,7 +166,6 @@
                                           SelectionMode="Extended"
                                           IsReadOnly="True"
                                           RowBackground="Transparent"
-                                          RowHeight="32"
                                           RightTapped="EventsDataGrid_RightTapped"
                                           LoadingRow="EventsDataGrid_LoadingRow">
                         <tkcontrols:DataGrid.Columns>

@@ -87,6 +87,10 @@
                         <ComboBox Grid.Column="1" x:Name="MaxRowLinesComboBox" SelectionChanged="MaxRowLinesComboBox_SelectionChanged" Width="200">
                             <ComboBoxItem Content="1 line" Tag="1" />
                             <ComboBoxItem Content="2 lines" Tag="2" />
+                            <ComboBoxItem Content="3 lines" Tag="3" />
+                            <ComboBoxItem Content="4 lines" Tag="4" />
+                            <ComboBoxItem Content="5 lines" Tag="5" />
+                            <ComboBoxItem Content="10 lines" Tag="10" />
                         </ComboBox>
                     </Grid>
 

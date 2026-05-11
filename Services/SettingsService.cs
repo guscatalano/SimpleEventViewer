@@ -30,6 +30,8 @@ public class SettingsService
 
     private SettingsService() { }
 
+    private static readonly int[] AllowedRowLines = { 1, 2, 3, 4, 5, 10 };
+
     public int MaxRowLines
     {
         get
@@ -37,9 +39,9 @@ public class SettingsService
             try
             {
                 var localSettings = ApplicationData.Current.LocalSettings;
-                if (localSettings.Values[MaxRowLinesKey] is int v)
+                if (localSettings.Values[MaxRowLinesKey] is int v && Array.IndexOf(AllowedRowLines, v) >= 0)
                 {
-                    return v == 2 ? 2 : 1;
+                    return v;
                 }
             }
             catch { }
@@ -47,10 +49,11 @@ public class SettingsService
         }
         set
         {
+            var clamped = Array.IndexOf(AllowedRowLines, value) >= 0 ? value : 1;
             try
             {
                 var localSettings = ApplicationData.Current.LocalSettings;
-                localSettings.Values[MaxRowLinesKey] = value == 2 ? 2 : 1;
+                localSettings.Values[MaxRowLinesKey] = clamped;
             }
             catch { }
             ThemeChanged?.Invoke();
