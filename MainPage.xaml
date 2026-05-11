@@ -86,38 +86,6 @@
                             </StackPanel>
 
                             <StackPanel Spacing="6">
-                                <TextBlock Text="Process" FontWeight="SemiBold" FontSize="13" />
-                                <ComboBox ItemsSource="{x:Bind ViewModel.ProcessCategories, Mode=OneWay}"
-                                          SelectedItem="{x:Bind ViewModel.SelectedProcess, Mode=TwoWay}"
-                                          DisplayMemberPath="Display"
-                                          HorizontalAlignment="Stretch" />
-                            </StackPanel>
-
-                            <StackPanel Spacing="6">
-                                <TextBlock Text="User" FontWeight="SemiBold" FontSize="13" />
-                                <ComboBox ItemsSource="{x:Bind ViewModel.UserCategories, Mode=OneWay}"
-                                          SelectedItem="{x:Bind ViewModel.SelectedUser, Mode=TwoWay}"
-                                          DisplayMemberPath="Display"
-                                          HorizontalAlignment="Stretch" />
-                            </StackPanel>
-
-                            <StackPanel Spacing="6">
-                                <TextBlock Text="Computer" FontWeight="SemiBold" FontSize="13" />
-                                <ComboBox ItemsSource="{x:Bind ViewModel.ComputerCategories, Mode=OneWay}"
-                                          SelectedItem="{x:Bind ViewModel.SelectedComputer, Mode=TwoWay}"
-                                          DisplayMemberPath="Display"
-                                          HorizontalAlignment="Stretch" />
-                            </StackPanel>
-
-                            <StackPanel Spacing="6">
-                                <TextBlock Text="Event Level" FontWeight="SemiBold" FontSize="13" />
-                                <ComboBox ItemsSource="{x:Bind ViewModel.AvailableTypes, Mode=OneWay}"
-                                          SelectedItem="{x:Bind ViewModel.SelectedType, Mode=TwoWay}"
-                                          DisplayMemberPath="Name"
-                                          HorizontalAlignment="Stretch" />
-                            </StackPanel>
-
-                            <StackPanel Spacing="6">
                                 <TextBlock Text="Time Range" FontWeight="SemiBold" FontSize="13" />
                                 <ComboBox ItemsSource="{x:Bind ViewModel.LoadWindows, Mode=OneWay}"
                                           SelectedItem="{x:Bind ViewModel.SelectedLoadWindow, Mode=TwoWay}"
@@ -147,9 +115,41 @@
                             </StackPanel>
 
                             <StackPanel Spacing="6">
-                                <TextBlock Text="Search" FontWeight="SemiBold" FontSize="13" />
+                                <TextBlock Text="Event Level" FontWeight="SemiBold" FontSize="13" />
+                                <ComboBox ItemsSource="{x:Bind ViewModel.AvailableTypes, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedType, Mode=TwoWay}"
+                                          DisplayMemberPath="Name"
+                                          HorizontalAlignment="Stretch" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Message" FontWeight="SemiBold" FontSize="13" />
                                 <TextBox PlaceholderText="Search messages..."
                                          Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="User" FontWeight="SemiBold" FontSize="13" />
+                                <ComboBox ItemsSource="{x:Bind ViewModel.UserCategories, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedUser, Mode=TwoWay}"
+                                          DisplayMemberPath="Display"
+                                          HorizontalAlignment="Stretch" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Process" FontWeight="SemiBold" FontSize="13" />
+                                <ComboBox ItemsSource="{x:Bind ViewModel.ProcessCategories, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedProcess, Mode=TwoWay}"
+                                          DisplayMemberPath="Display"
+                                          HorizontalAlignment="Stretch" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Computer" FontWeight="SemiBold" FontSize="13" />
+                                <ComboBox ItemsSource="{x:Bind ViewModel.ComputerCategories, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedComputer, Mode=TwoWay}"
+                                          DisplayMemberPath="Display"
+                                          HorizontalAlignment="Stretch" />
                             </StackPanel>
 
                             <Button Content="Clear All Filters" Click="ClearFilters_Click"
