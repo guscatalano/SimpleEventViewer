@@ -701,10 +701,19 @@ public partial class MainViewModel : ObservableObject
             channel
         );
 
-        FilteredEvents.Clear();
-        foreach (var entry in filtered)
+        // For large result sets, replacing the collection is far cheaper than
+        // N individual Add calls (each of which triggers a DataGrid layout pass).
+        if (filtered.Count > 500)
         {
-            FilteredEvents.Add(entry);
+            FilteredEvents = new ObservableCollection<EventLogEntry>(filtered);
+        }
+        else
+        {
+            FilteredEvents.Clear();
+            foreach (var entry in filtered)
+            {
+                FilteredEvents.Add(entry);
+            }
         }
     }
 
@@ -726,8 +735,11 @@ public partial class MainViewModel : ObservableObject
         CurrentSource = System.IO.Path.GetFileName(filePath);
         CancelPrefetch();
         FilteredEvents.Clear();
-        _isStreaming = true;
-        _flushTimer?.Start();
+        // Don't stream file loads: a typical EVTX has tens of thousands of events.
+        // Draining them one-by-one on the UI thread freezes the app.
+        // Load everything on a background thread, then do a single bulk replace.
+        _isStreaming = false;
+        _flushTimer?.Stop();
         while (_pendingEvents.TryDequeue(out _)) { }
 
         // Reset all filter selections so previously-selected values don't filter out the new file's events.
@@ -777,11 +789,7 @@ public partial class MainViewModel : ObservableObject
                 }
             });
 
-            // We're back on the UI thread after await; no need for TryEnqueue
-            FlushPendingEvents();
-            while (_pendingEvents.Count > 0) FlushPendingEvents();
-            _isStreaming = false;
-            _flushTimer?.Stop();
+            // We're back on the UI thread after await
             UpdateSourceCategories();
             ApplyFilters();
             StatusMessage = $"Loaded {EventLogService.Instance.Events.Count} events from {fileType} file";

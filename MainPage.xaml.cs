@@ -143,6 +143,11 @@ public sealed partial class MainPage : Page
         ViewModel.RefreshCurrentView();
     }
 
+    private void LoadLocalEventLog_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.RefreshCurrentView();
+    }
+
     private void LoadEvtxFile_Click(object sender, RoutedEventArgs e)
     {
         var path = PickFile("Select EVTX file", "Event log files", ".evtx");
