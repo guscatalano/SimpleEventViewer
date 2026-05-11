@@ -282,10 +282,10 @@ public class EventLogService
         ).OrderByDescending(e => e.TimeCreated).ToList();
     }
 
-    public List<string> GetAvailableSources() => _sourceCounts.OrderByDescending(x => x.Value).Select(x => x.Key).ToList();
-    public List<string> GetAvailableProcesses() => _processCounts.OrderByDescending(x => x.Value).Select(x => x.Key).ToList();
-    public List<string> GetAvailableUsers() => _userCounts.OrderByDescending(x => x.Value).Select(x => x.Key).ToList();
-    public List<string> GetAvailableComputers() => _computerCounts.OrderByDescending(x => x.Value).Select(x => x.Key).ToList();
+    public List<string> GetAvailableSources() => _sourceCounts.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
+    public List<string> GetAvailableProcesses() => _processCounts.Keys.OrderBy(k => int.TryParse(k, out var n) ? n : int.MaxValue).ToList();
+    public List<string> GetAvailableUsers() => _userCounts.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
+    public List<string> GetAvailableComputers() => _computerCounts.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
 
     private EventLogEntry? ConvertToEntry(EventRecord record)
     {
