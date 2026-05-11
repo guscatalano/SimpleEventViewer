@@ -9,6 +9,7 @@ using SimpleEventViewer_WinUI.Services;
 using SimpleEventViewer_WinUI.ViewModels;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
@@ -31,35 +32,46 @@ public sealed partial class MainPage : Page
         SettingsService.Instance.ThemeChanged += OnThemeChanged;
     }
 
+    private string? _rightClickedCellValue;
+
     private MenuFlyout BuildRowContextMenu()
     {
         var menu = new MenuFlyout();
 
-        var copyItem = new MenuFlyoutItem { Text = "Copy" };
-        copyItem.Click += CopyRows_Click;
-        copyItem.KeyboardAccelerators.Add(new KeyboardAccelerator { Modifiers = Windows.System.VirtualKeyModifiers.Control, Key = Windows.System.VirtualKey.C });
-        menu.Items.Add(copyItem);
+        var copyRowItem = new MenuFlyoutItem { Text = "Copy row" };
+        copyRowItem.Click += CopyRows_Click;
+        copyRowItem.KeyboardAccelerators.Add(new KeyboardAccelerator { Modifiers = Windows.System.VirtualKeyModifiers.Control, Key = Windows.System.VirtualKey.C });
+        menu.Items.Add(copyRowItem);
 
-        var csvItem = new MenuFlyoutItem { Text = "Copy as CSV" };
-        csvItem.Click += CopyRowsAsCsv_Click;
-        menu.Items.Add(csvItem);
+        var copyCellItem = new MenuFlyoutItem { Text = "Copy cell" };
+        copyCellItem.Click += CopyCell_Click;
+        menu.Items.Add(copyCellItem);
 
-        var msgItem = new MenuFlyoutItem { Text = "Copy message only" };
-        msgItem.Click += CopyMessage_Click;
-        menu.Items.Add(msgItem);
+        var copyMessageItem = new MenuFlyoutItem { Text = "Copy message only" };
+        copyMessageItem.Click += CopyMessage_Click;
+        menu.Items.Add(copyMessageItem);
 
         menu.Items.Add(new MenuFlyoutSeparator());
 
-        var selectAll = new MenuFlyoutItem { Text = "Select all" };
-        selectAll.Click += SelectAllRows_Click;
-        selectAll.KeyboardAccelerators.Add(new KeyboardAccelerator { Modifiers = Windows.System.VirtualKeyModifiers.Control, Key = Windows.System.VirtualKey.A });
-        menu.Items.Add(selectAll);
+        var copyAsItem = new MenuFlyoutSubItem { Text = "Copy as..." };
+        var csvItem = new MenuFlyoutItem { Text = "CSV" };
+        csvItem.Click += CopyRowsAsCsv_Click;
+        copyAsItem.Items.Add(csvItem);
+
+        var jsonItem = new MenuFlyoutItem { Text = "JSON" };
+        jsonItem.Click += CopyRowsAsJson_Click;
+        copyAsItem.Items.Add(jsonItem);
+
+        menu.Items.Add(copyAsItem);
 
         return menu;
     }
 
     private void EventsDataGrid_RightTapped(object sender, RightTappedRoutedEventArgs e)
     {
+        // Capture the right-clicked cell value (for Copy cell)
+        _rightClickedCellValue = (e.OriginalSource as TextBlock)?.Text;
+
         // If the right-clicked row isn't already in the selection, make it the only selection
         var fe = e.OriginalSource as FrameworkElement;
         var dc = fe?.DataContext;
@@ -71,6 +83,39 @@ public sealed partial class MainPage : Page
 
         _rowContextMenu.ShowAt(EventsDataGrid, e.GetPosition(EventsDataGrid));
         e.Handled = true;
+    }
+
+    private void CopyCell_Click(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(_rightClickedCellValue))
+        {
+            SetClipboard(_rightClickedCellValue);
+        }
+    }
+
+    private void CopyRowsAsJson_Click(object sender, RoutedEventArgs e)
+    {
+        var entries = GetSelectedEntries().ToList();
+        if (entries.Count == 0) return;
+
+        var simplified = entries.Select(en => new
+        {
+            en.TimeCreated,
+            Level = en.LevelName,
+            en.Id,
+            Source = en.ProviderName,
+            en.TaskName,
+            en.Keywords,
+            User = en.Username,
+            en.ProcessId,
+            en.ThreadId,
+            en.Computer,
+            en.Message,
+            en.Xml
+        });
+
+        var json = JsonSerializer.Serialize(simplified, new JsonSerializerOptions { WriteIndented = true });
+        SetClipboard(json);
     }
 
     private void OnThemeChanged()
@@ -264,15 +309,6 @@ public sealed partial class MainPage : Page
         var text = string.Join(Environment.NewLine + Environment.NewLine,
             entries.Select(en => en.Message));
         SetClipboard(text);
-    }
-
-    private void SelectAllRows_Click(object sender, RoutedEventArgs e)
-    {
-        EventsDataGrid.SelectedItems.Clear();
-        foreach (var item in ViewModel.FilteredEvents)
-        {
-            EventsDataGrid.SelectedItems.Add(item);
-        }
     }
 
     private static string CsvEscape(string? value)
