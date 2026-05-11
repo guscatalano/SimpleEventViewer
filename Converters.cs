@@ -42,6 +42,27 @@ public class DateOffsetConverter : IValueConverter
     }
 }
 
+public class TimeSpanConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        if (value is TimeSpan ts)
+        {
+            return (TimeSpan?)ts;
+        }
+        return (TimeSpan?)TimeSpan.Zero;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    {
+        if (value is TimeSpan ts)
+        {
+            return ts;
+        }
+        return TimeSpan.Zero;
+    }
+}
+
 public class LevelToBrushConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, string language)
