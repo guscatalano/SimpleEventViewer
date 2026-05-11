@@ -730,15 +730,34 @@ public partial class MainViewModel : ObservableObject
         _flushTimer?.Start();
         while (_pendingEvents.TryDequeue(out _)) { }
 
-        // Default to "All time" when loading a file - the file's events likely aren't in the last 24h
+        // Reset all filter selections so previously-selected values don't filter out the new file's events.
+        // Setting fields directly + raising PropertyChanged avoids triggering ApplyFilters on every reset.
         var allTime = LoadWindows.FirstOrDefault(w => w.Lookback == null && !w.IsCustom);
-        if (allTime != null && _selectedLoadWindow != allTime)
-        {
-            // Set the field directly to avoid triggering reload
-            _selectedLoadWindow = allTime;
-            OnPropertyChanged(nameof(SelectedLoadWindow));
-            OnPropertyChanged(nameof(IsCustomRange));
-        }
+        if (allTime != null) _selectedLoadWindow = allTime;
+        _selectedType = AvailableTypes[0];
+        _selectedSource = null;
+        _selectedProcess = null;
+        _selectedUser = null;
+        _selectedComputer = null;
+        _selectedChannel = null;
+        _startTime = null;
+        _endTime = null;
+        _startTimeOfDay = TimeSpan.Zero;
+        _endTimeOfDay = new TimeSpan(23, 59, 59);
+        _searchText = string.Empty;
+        OnPropertyChanged(nameof(SelectedLoadWindow));
+        OnPropertyChanged(nameof(IsCustomRange));
+        OnPropertyChanged(nameof(SelectedType));
+        OnPropertyChanged(nameof(SelectedSource));
+        OnPropertyChanged(nameof(SelectedProcess));
+        OnPropertyChanged(nameof(SelectedUser));
+        OnPropertyChanged(nameof(SelectedComputer));
+        OnPropertyChanged(nameof(SelectedChannel));
+        OnPropertyChanged(nameof(StartTime));
+        OnPropertyChanged(nameof(EndTime));
+        OnPropertyChanged(nameof(StartTimeOfDay));
+        OnPropertyChanged(nameof(EndTimeOfDay));
+        OnPropertyChanged(nameof(SearchText));
 
         try
         {
@@ -758,25 +777,20 @@ public partial class MainViewModel : ObservableObject
                 }
             });
 
-            _dispatcherQueue.TryEnqueue(() =>
-            {
-                FlushPendingEvents();
-                while (_pendingEvents.Count > 0) FlushPendingEvents();
-                _isStreaming = false;
-                _flushTimer?.Stop();
-                UpdateSourceCategories();
-                ApplyFilters();
-                StatusMessage = $"Loaded {EventLogService.Instance.Events.Count} events from {fileType} file";
-            });
+            // We're back on the UI thread after await; no need for TryEnqueue
+            FlushPendingEvents();
+            while (_pendingEvents.Count > 0) FlushPendingEvents();
+            _isStreaming = false;
+            _flushTimer?.Stop();
+            UpdateSourceCategories();
+            ApplyFilters();
+            StatusMessage = $"Loaded {EventLogService.Instance.Events.Count} events from {fileType} file";
         }
         catch (Exception ex)
         {
             _isStreaming = false;
             _flushTimer?.Stop();
-            _dispatcherQueue.TryEnqueue(() =>
-            {
-                StatusMessage = $"Error: {ex.Message}";
-            });
+            StatusMessage = $"Error: {ex.Message}";
         }
     }
 }
