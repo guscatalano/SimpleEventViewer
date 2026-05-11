@@ -75,6 +75,21 @@
                         </ComboBox>
                     </Grid>
 
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Message Lines" FontWeight="SemiBold" />
+                            <TextBlock Text="How many lines of the message to show per row" Opacity="0.7" FontSize="12" />
+                        </StackPanel>
+                        <ComboBox Grid.Column="1" x:Name="MaxRowLinesComboBox" SelectionChanged="MaxRowLinesComboBox_SelectionChanged" Width="200">
+                            <ComboBoxItem Content="1 line" Tag="1" />
+                            <ComboBoxItem Content="2 lines" Tag="2" />
+                        </ComboBox>
+                    </Grid>
+
                     <!-- Preview swatches -->
                     <StackPanel Spacing="8" Margin="0,8,0,0">
                         <TextBlock Text="Color Preview" FontWeight="SemiBold" />

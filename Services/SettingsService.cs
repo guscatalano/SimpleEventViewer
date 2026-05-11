@@ -24,10 +24,38 @@ public class SettingsService
     private const string ThemeKey = "AppTheme";
     private const string AccentColorKey = "AccentColor";
     private const string RowColorModeKey = "RowColorMode";
+    private const string MaxRowLinesKey = "MaxRowLines";
 
     public event Action? ThemeChanged;
 
     private SettingsService() { }
+
+    public int MaxRowLines
+    {
+        get
+        {
+            try
+            {
+                var localSettings = ApplicationData.Current.LocalSettings;
+                if (localSettings.Values[MaxRowLinesKey] is int v)
+                {
+                    return v == 2 ? 2 : 1;
+                }
+            }
+            catch { }
+            return 1;
+        }
+        set
+        {
+            try
+            {
+                var localSettings = ApplicationData.Current.LocalSettings;
+                localSettings.Values[MaxRowLinesKey] = value == 2 ? 2 : 1;
+            }
+            catch { }
+            ThemeChanged?.Invoke();
+        }
+    }
 
     public RowColorMode RowColorMode
     {

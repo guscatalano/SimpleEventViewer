@@ -31,8 +31,18 @@ public sealed partial class SettingsPage : Page
         }
 
         RowColorModeComboBox.SelectedIndex = (int)SettingsService.Instance.RowColorMode;
+        MaxRowLinesComboBox.SelectedIndex = SettingsService.Instance.MaxRowLines == 2 ? 1 : 0;
 
         UpdateSwatches(color);
+    }
+
+    private void MaxRowLinesComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (MaxRowLinesComboBox.SelectedItem is ComboBoxItem item && item.Tag != null
+            && int.TryParse(item.Tag.ToString(), out var lines))
+        {
+            SettingsService.Instance.MaxRowLines = lines;
+        }
     }
 
     private void RowColorModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
