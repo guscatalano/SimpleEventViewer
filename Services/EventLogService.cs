@@ -60,6 +60,51 @@ public class EventLogService
         return count;
     }
 
+    public void AppendOlderSystemLogs(DateTime olderThan, System.Threading.CancellationToken token)
+    {
+        // Query events older than olderThan, do NOT clear existing data
+        var query = new EventLogQuery("Application", PathType.LogName, BuildQuery(null, null, olderThan))
+        {
+            ReverseDirection = true
+        };
+
+        using var reader = new EventLogReader(query);
+
+        const int batchSize = 100;
+        var batch = new List<EventLogEntry>(batchSize);
+
+        while (!token.IsCancellationRequested)
+        {
+            var entry = reader.ReadEvent();
+            if (entry == null) break;
+
+            var logEntry = ConvertToEntry(entry);
+            if (logEntry != null)
+            {
+                _events.Add(logEntry);
+                batch.Add(logEntry);
+                var source = logEntry.ProviderName;
+                _sourceCounts.AddOrUpdate(source, 1, (key, count) => count + 1);
+
+                if (batch.Count >= batchSize)
+                {
+                    OnEventBatchLoaded?.Invoke(batch);
+                    batch = new List<EventLogEntry>(batchSize);
+                }
+            }
+        }
+
+        if (batch.Count > 0)
+        {
+            OnEventBatchLoaded?.Invoke(batch);
+        }
+
+        if (!token.IsCancellationRequested)
+        {
+            OnLoadComplete?.Invoke();
+        }
+    }
+
     public void LoadCurrentSystemLogs(TimeSpan? lookback = null, DateTime? start = null, DateTime? end = null)
     {
         _events.Clear();
