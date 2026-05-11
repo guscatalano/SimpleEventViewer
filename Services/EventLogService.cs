@@ -314,20 +314,7 @@ public class EventLogService
         string? processId = null,
         string? computer = null,
         string? channel = null)
-    {
-        var allEvents = _events.ToList();
-        return allEvents.Where(e =>
-            (string.IsNullOrEmpty(source) || e.ProviderName == source) &&
-            (level == null || e.Level == level.Value) &&
-            (!startTime.HasValue || e.TimeCreated >= startTime.Value) &&
-            (!endTime.HasValue || e.TimeCreated <= endTime.Value) &&
-            (string.IsNullOrEmpty(username) || e.Username == username) &&
-            (string.IsNullOrEmpty(processId) || e.ProcessId.ToString() == processId) &&
-            (string.IsNullOrEmpty(computer) || e.Computer == computer) &&
-            (string.IsNullOrEmpty(channel) || e.Channel == channel) &&
-            (string.IsNullOrEmpty(searchTerms) || e.Message.Contains(searchTerms, StringComparison.OrdinalIgnoreCase))
-        ).OrderByDescending(e => e.TimeCreated).ToList();
-    }
+        => EventFilter.Apply(_events, source, level, startTime, endTime, username, searchTerms, processId, computer, channel);
 
     public List<string> GetAvailableSources() => _sourceCounts.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
     public List<string> GetAvailableProcesses() => _processCounts.Keys.OrderBy(k => int.TryParse(k, out var n) ? n : int.MaxValue).ToList();

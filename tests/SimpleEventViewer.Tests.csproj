@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>SimpleEventViewer.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!--
+    Pull in just the pure logic files from the main project. This avoids dragging
+    in the WindowsAppSDK runtime initializer which requires package identity.
+  -->
+  <ItemGroup>
+    <Compile Include="..\Models\EventLevel.cs" Link="Models\EventLevel.cs" />
+    <Compile Include="..\Models\EventLogEntry.cs" Link="Models\EventLogEntry.cs" />
+    <Compile Include="..\Services\EventFilter.cs" Link="Services\EventFilter.cs" />
+  </ItemGroup>
+
+</Project>
