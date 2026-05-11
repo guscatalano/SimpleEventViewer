@@ -104,11 +104,12 @@ public sealed partial class MainPage : Page
     }
 
     private double _savedFilterWidth = 300;
+    private double _savedDetailsHeight = 280;
 
     private void CollapseFilters_Click(object sender, RoutedEventArgs e)
     {
-        _savedFilterWidth = FilterColumn.Width.Value;
-        FilterColumn.Width = new GridLength(0);
+        _savedFilterWidth = FilterColumn.ActualWidth > 50 ? FilterColumn.ActualWidth : 300;
+        FilterColumn.Width = GridLength.Auto;
         FilterPanel.Visibility = Visibility.Collapsed;
         FilterSplitter.Visibility = Visibility.Collapsed;
         CollapsedFilterButton.Visibility = Visibility.Visible;
@@ -120,6 +121,23 @@ public sealed partial class MainPage : Page
         FilterPanel.Visibility = Visibility.Visible;
         FilterSplitter.Visibility = Visibility.Visible;
         CollapsedFilterButton.Visibility = Visibility.Collapsed;
+    }
+
+    private void CollapseDetails_Click(object sender, RoutedEventArgs e)
+    {
+        _savedDetailsHeight = DetailsRow.ActualHeight > 60 ? DetailsRow.ActualHeight : 280;
+        DetailsRow.Height = GridLength.Auto;
+        DetailsPanel.Visibility = Visibility.Collapsed;
+        DetailsSplitter.Visibility = Visibility.Collapsed;
+        CollapsedDetailsBar.Visibility = Visibility.Visible;
+    }
+
+    private void ExpandDetails_Click(object sender, RoutedEventArgs e)
+    {
+        DetailsRow.Height = new GridLength(_savedDetailsHeight > 100 ? _savedDetailsHeight : 280);
+        DetailsPanel.Visibility = Visibility.Visible;
+        DetailsSplitter.Visibility = Visibility.Visible;
+        CollapsedDetailsBar.Visibility = Visibility.Collapsed;
     }
 
     private static readonly LevelToRowBrushConverter _rowBrushConverter = new();
