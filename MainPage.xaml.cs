@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Media;
 using SimpleEventViewer.Models;
 using SimpleEventViewer.Services;
 using SimpleEventViewer.ViewModels;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -29,14 +30,31 @@ public sealed partial class MainPage : Page
 
         // Refresh row colors when theme/color scheme changes
         SettingsService.Instance.ThemeChanged += OnThemeChanged;
+        SettingsService.Instance.ExperimentalFormatsChanged += OnExperimentalFormatsChanged;
 
         // If a file was passed on the command line, load it after the page is ready.
         Loaded += MainPage_Loaded;
     }
 
+    private void OnExperimentalFormatsChanged()
+    {
+        DispatcherQueue.TryEnqueue(UpdateExperimentalButtons);
+    }
+
+    private void UpdateExperimentalButtons()
+    {
+        var on = SettingsService.Instance.ExperimentalFileFormats;
+        LoadXmlButton.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        LoadEtlButton.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private void MainPage_Loaded(object sender, RoutedEventArgs e)
     {
         Loaded -= MainPage_Loaded;
+
+        RestoreColumnWidths();
+        UpdateExperimentalButtons();
+
         var startupFile = (Application.Current as App)?.StartupFilePath;
         if (!string.IsNullOrEmpty(startupFile))
         {
@@ -49,6 +67,51 @@ public sealed partial class MainPage : Page
             {
                 ViewModel.StatusMessage = $"Unsupported file type: .{ext}";
             }
+        }
+    }
+
+    /// <summary>
+    /// Restore saved column widths if the setting is enabled. The "Message"
+    /// star column is intentionally skipped so it keeps consuming the
+    /// remaining horizontal space.
+    /// </summary>
+    private void RestoreColumnWidths()
+    {
+        if (!SettingsService.Instance.RememberColumnWidths) return;
+        var widths = SettingsService.Instance.LoadColumnWidths();
+        if (widths == null) return;
+
+        foreach (var col in EventsDataGrid.Columns)
+        {
+            var tag = col.Tag?.ToString();
+            if (tag == null) continue;
+            if (tag == "Message") continue; // star-sized
+            if (widths.TryGetValue(tag, out var w) && w > 20 && w < 4000)
+            {
+                col.Width = new DataGridLength(w);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Save current column widths to settings. Called from the Window.Closed
+    /// hook in MainWindow so widths survive across launches.
+    /// </summary>
+    public void SaveColumnWidths()
+    {
+        if (!SettingsService.Instance.RememberColumnWidths) return;
+        var widths = new Dictionary<string, double>();
+        foreach (var col in EventsDataGrid.Columns)
+        {
+            var tag = col.Tag?.ToString();
+            if (string.IsNullOrEmpty(tag)) continue;
+            if (tag == "Message") continue;
+            var w = col.ActualWidth;
+            if (w > 20) widths[tag] = w;
+        }
+        if (widths.Count > 0)
+        {
+            SettingsService.Instance.SaveColumnWidths(widths);
         }
     }
 
@@ -140,15 +203,42 @@ public sealed partial class MainPage : Page
 
     private void OnThemeChanged()
     {
+        // Walk visible DataGridRow instances in the visual tree and refresh
+        // each row's Background directly. This avoids rebuilding the entire
+        // FilteredEvents ObservableCollection, which froze the UI for several
+        // seconds with 50k+ events because every Add raised a CollectionChanged
+        // that the DataGrid had to react to. Unrealized rows are re-themed by
+        // EventsDataGrid_LoadingRow when they scroll into view.
         DispatcherQueue.TryEnqueue(() =>
         {
-            var temp = ViewModel.FilteredEvents.ToList();
-            ViewModel.FilteredEvents.Clear();
-            foreach (var item in temp)
+            try
             {
-                ViewModel.FilteredEvents.Add(item);
+                foreach (var row in FindVisualChildren<CommunityToolkit.WinUI.UI.Controls.DataGridRow>(EventsDataGrid))
+                {
+                    if (row.DataContext is EventLogEntry entry)
+                    {
+                        var brush = _rowBrushConverter.Convert(entry.Level, typeof(Brush), null, "") as Brush;
+                        row.Background = brush ?? _transparentBrush;
+                    }
+                }
             }
+            catch { }
         });
+    }
+
+    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject? parent) where T : DependencyObject
+    {
+        if (parent == null) yield break;
+        var count = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(parent);
+        for (int i = 0; i < count; i++)
+        {
+            var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(parent, i);
+            if (child is T tChild) yield return tChild;
+            foreach (var descendant in FindVisualChildren<T>(child))
+            {
+                yield return descendant;
+            }
+        }
     }
 
     private void MessageText_Loaded(object sender, RoutedEventArgs e)

@@ -1,6 +1,8 @@
 # Sample fixtures
 
-Test event log files in each supported format. Use them to manually verify the **Load EVTX** / **Load XML** / **Load ETL** buttons, or load them via CLI:
+Test event log files in each supported format. Use them to manually verify the **Load EVTX** / **Load XML\*** / **Load ETL\*** buttons, or load them via CLI:
+
+> **\* XML and ETL support is experimental.** EVTX is the primary, fully-supported format. XML files are parsed event-by-event and only formats produced by `wevtutil qe ... /f:xml` are reliably supported; ETL traces are read via `EventLogReader` and may show limited detail for kernel/provider traces.
 
 ```
 SimpleEventViewer.exe samples\sample.evtx

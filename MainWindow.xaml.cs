@@ -23,5 +23,24 @@ public sealed partial class MainWindow : Window
 
         // Navigate the root frame to the main page on startup.
         RootFrame.Navigate(typeof(MainPage));
+
+        Closed += MainWindow_Closed;
+    }
+
+    private void MainWindow_Closed(object sender, WindowEventArgs args)
+    {
+        // Persist DataGrid column widths from the active MainPage so they
+        // survive across launches.
+        try
+        {
+            if (RootFrame.Content is MainPage page)
+            {
+                page.SaveColumnWidths();
+            }
+        }
+        catch { }
+
+        // Tear down the MCP listener so the port is released cleanly.
+        try { SimpleEventViewer.Services.Mcp.EventLogMcpServer.Instance.Stop(); } catch { }
     }
 }

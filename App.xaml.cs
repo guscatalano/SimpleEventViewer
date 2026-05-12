@@ -36,6 +36,17 @@ public partial class App : Application
     public App()
     {
         InitializeComponent();
+        UnhandledException += (s, e) =>
+        {
+            try
+            {
+                var path = System.IO.Path.Combine(
+                    System.IO.Path.GetTempPath(), "simpleeventviewer-crash.log");
+                System.IO.File.AppendAllText(path,
+                    $"[{DateTime.Now:o}] {e.Message}\r\n{e.Exception}\r\n---\r\n");
+            }
+            catch { }
+        };
     }
 
     /// <summary>
@@ -52,12 +63,35 @@ public partial class App : Application
             return;
         }
 
+        // Apply the saved accent scheme BEFORE the window is shown so the
+        // initial render uses the right colors. Defensive — never let a
+        // theme-application failure block the app from showing.
+        try
+        {
+            SimpleEventViewer.Services.AccentTheme.ApplyToApplication(
+                SimpleEventViewer.Services.SettingsService.Instance.AccentColor);
+        }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[App] accent apply failed: {ex}"); }
+
         MainWindow = new MainWindow();
         MainWindow.Activate();
 
-        // Apply saved theme
-        SimpleEventViewer.Services.SettingsService.Instance.ApplyTheme(
-            SimpleEventViewer.Services.SettingsService.Instance.Theme);
+        // Apply saved theme (light/dark/system) — also defensive.
+        try
+        {
+            SimpleEventViewer.Services.SettingsService.Instance.ApplyTheme(
+                SimpleEventViewer.Services.SettingsService.Instance.Theme);
+        }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[App] theme apply failed: {ex}"); }
+
+        // Start the MCP server if the user enabled it last session.
+        try
+        {
+            SimpleEventViewer.Services.Mcp.EventLogMcpServer.Instance.ApplyConfiguration(
+                SimpleEventViewer.Services.SettingsService.Instance.McpServerEnabled,
+                SimpleEventViewer.Services.SettingsService.Instance.McpServerPort);
+        }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[App] mcp apply failed: {ex}"); }
     }
 
     /// <summary>
