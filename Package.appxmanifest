@@ -9,15 +9,15 @@
   IgnorableNamespaces="uap rescap systemai">
 
   <Identity
-    Name="AF922A60-D6AB-4215-BA5E-98EAB55DFBB2"
-    Publisher="CN=AppPublisher"
+    Name="GusCatalano.SimpleEventViewer"
+    Publisher="CN=119E0257-3B74-437C-A728-AC7C50256853"
     Version="1.0.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="AF922A60-D6AB-4215-BA5E-98EAB55DFBB2" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
     <DisplayName>SimpleEventViewer</DisplayName>
-    <PublisherDisplayName>AppPublisher</PublisherDisplayName>
+    <PublisherDisplayName>Gus Catalano</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
