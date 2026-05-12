@@ -4,13 +4,17 @@ A modern Windows Event Log viewer built with **WinUI 3** and the Windows App SDK
 
 ![App icon](Assets/AppIcon.png)
 
+![Screenshot](docs/screenshot.png)
+
 ## Features
 
 ### Data sources
 - **Live system logs** (Application channel) via `EventLogReader`
 - **EVTX files** (`.evtx`) — native read via `EventLogReader` with `PathType.FilePath`
-- **XML files** (`.xml`) *(experimental)* — parsed events from saved event XML; only `wevtutil qe ... /f:xml` output is reliably supported
-- **ETL files** (`.etl`) *(experimental)* — read via `EventLogReader`; kernel/provider traces may render with limited detail
+- **XML files** (`.xml`) *(experimental, off by default)* — parsed events from saved event XML; only `wevtutil qe ... /f:xml` output is reliably supported
+- **ETL files** (`.etl`) *(experimental, off by default)* — read via `EventLogReader`; kernel/provider traces may render with limited detail
+
+The XML and ETL loaders are hidden by default and only appear in the toolbar once you flip **Settings → Experimental features → Load XML / ETL files**.
 
 The current source is shown in the status bar (e.g. "Live system logs" or "MyExport.evtx").
 
@@ -66,12 +70,13 @@ Right-click on a row (or selection) for:
 
 ### Settings
 Available via the gear icon in the toolbar:
-- **Theme** — System / Light / Dark
-- **Color scheme** — Default, Blue, Green, Purple, Orange, Red. Drives the level badges *and* app-wide accent colors (buttons, focus rings, DataGrid selection highlight)
+- **Theme** — System default / Light / Dark, plus bundled presets **High Contrast**, **Nord (dark)**, **Dracula (dark)**, **Solarized (dark)**, **Sepia (light)**. Curated presets carry their own accent palette.
+- **Color scheme** — Default, Blue, Green, Purple, Orange, Red. Drives the level badges *and* app-wide accent colors (buttons, focus rings, DataGrid selection highlight). Ignored while a curated preset is active.
 - **Row color style** — Badge only / Entire row
 - **Message lines** — 1, 2, 3, 4, 5, or 10 line cap per row
 - **Remember column widths** — DataGrid column widths are restored on next launch (on by default)
-- **MCP server** — toggle a local Model Context Protocol server (see below); port is configurable, default 7321
+- **Experimental features → Load XML / ETL files** — shows the experimental XML/ETL toolbar buttons (off by default)
+- **MCP server** — toggle a local Model Context Protocol server (see below); port is configurable, default 7321. Settings page exposes copyable client configs for VS Code, Cursor, Claude Desktop, and Claude Code.
 
 All settings persist to `ApplicationData.Current.LocalSettings`.
 
@@ -108,17 +113,25 @@ curl -X POST http://127.0.0.1:7321/ -H "Content-Type: application/json" `
 ```
 SimpleEventViewer/
 ├── Models/
-│   ├── EventLevel.cs         # LogLevel enum (Critical, Error, ...)
-│   └── EventLogEntry.cs      # Event model + SourceCategory
+│   ├── EventLevel.cs              # LogLevel enum (Critical, Error, ...)
+│   └── EventLogEntry.cs           # Event model + SourceCategory
 ├── Services/
-│   ├── EventLogService.cs    # Singleton; reads logs, streams batches via events
-│   └── SettingsService.cs    # Singleton; persisted UI preferences
+│   ├── EventLogService.cs         # Singleton; reads logs, streams batches via events
+│   ├── EventLogFileReader.cs      # Pure file-read logic (testable, no WindowsAppSDK dep)
+│   ├── EventFilter.cs             # Pure filter logic (used by ViewModel + tests)
+│   ├── SettingsService.cs         # Singleton; persisted UI preferences
+│   ├── AccentTheme.cs             # App-wide accent + surface-brush mutation
+│   ├── ThemePresets.cs            # Nord / Dracula / Solarized / Sepia / High Contrast palettes
+│   └── Mcp/
+│       └── EventLogMcpServer.cs   # Local MCP server (HTTP + JSON-RPC)
 ├── ViewModels/
-│   └── MainViewModel.cs      # ObservableObject; bindings + filter logic
-├── Converters.cs             # Level→Brush, DateTimeOffset, etc.
-├── MainPage.xaml             # Main UI
-├── SettingsPage.xaml         # Settings page (Frame navigation from MainPage)
-└── installer.wxs             # WiX 5 installer definition
+│   └── MainViewModel.cs           # ObservableObject; bindings + filter logic
+├── Converters.cs                  # Level→Brush, DateTimeOffset, etc.
+├── Win32FilePicker.cs             # P/Invoke GetOpenFileName (more reliable than FileOpenPicker)
+├── MainPage.xaml                  # Main UI
+├── SettingsPage.xaml              # Settings page (Frame navigation from MainPage)
+├── Package.appxmanifest           # MSIX identity (Store-registered)
+└── installer.wxs                  # WiX 5 installer definition
 ```
 
 ### Threading model
