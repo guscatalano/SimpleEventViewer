@@ -76,7 +76,7 @@ All settings persist to `ApplicationData.Current.LocalSettings`.
 ## Architecture
 
 ```
-SimpleEventViewer.WinUI/
+SimpleEventViewer/
 ├── Models/
 │   ├── EventLevel.cs         # LogLevel enum (Critical, Error, ...)
 │   └── EventLogEntry.cs      # Event model + SourceCategory

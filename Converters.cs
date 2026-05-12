@@ -2,11 +2,11 @@ using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Media;
-using SimpleEventViewer_WinUI.Models;
-using SimpleEventViewer_WinUI.Services;
+using SimpleEventViewer.Models;
+using SimpleEventViewer.Services;
 using Windows.UI;
 
-namespace SimpleEventViewer_WinUI;
+namespace SimpleEventViewer;
 
 public class NullToVisibilityConverter : IValueConverter
 {

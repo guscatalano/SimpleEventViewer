@@ -43,14 +43,14 @@ jobs:
           echo "App version: $v"
 
       - name: Restore
-        run: msbuild SimpleEventViewer.WinUI.csproj /t:Restore /p:Configuration=$env:Configuration /p:Platform=$env:Platform
+        run: msbuild SimpleEventViewer.csproj /t:Restore /p:Configuration=$env:Configuration /p:Platform=$env:Platform
 
       - name: Run tests
         run: dotnet test tests/SimpleEventViewer.Tests.csproj --configuration $env:Configuration
 
       - name: Build MSIX
         run: |
-          msbuild SimpleEventViewer.WinUI.csproj `
+          msbuild SimpleEventViewer.csproj `
             /p:Configuration=$env:Configuration `
             /p:Platform=$env:Platform `
             /p:GenerateAppxPackageOnBuild=true `
@@ -63,7 +63,7 @@ jobs:
 
       - name: Publish for MSI
         run: |
-          dotnet publish SimpleEventViewer.WinUI.csproj `
+          dotnet publish SimpleEventViewer.csproj `
             -c $env:Configuration `
             -p:Platform=$env:Platform `
             -r win-x64 `

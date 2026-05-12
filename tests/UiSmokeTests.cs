@@ -315,7 +315,7 @@ public class UiSmokeTests : IDisposable
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         for (int i = 0; i < 8 && current != null; i++, current = current.Parent)
         {
-            var candidate = Path.Combine(current.FullName, "SimpleEventViewer.WinUI.csproj");
+            var candidate = Path.Combine(current.FullName, "SimpleEventViewer.csproj");
             if (File.Exists(candidate)) return current.FullName;
         }
         return null;

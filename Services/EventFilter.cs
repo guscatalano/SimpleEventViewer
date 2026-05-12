@@ -1,6 +1,6 @@
-using SimpleEventViewer_WinUI.Models;
+using SimpleEventViewer.Models;
 
-namespace SimpleEventViewer_WinUI.Services;
+namespace SimpleEventViewer.Services;
 
 /// <summary>
 /// Pure filter logic for event log entries. Lives in its own file with no
