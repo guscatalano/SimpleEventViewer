@@ -29,8 +29,14 @@
                 <AppBarButton Icon="Refresh" Label="Refresh" Click="RefreshButton_Click" />
                 <AppBarSeparator />
                 <AppBarButton Icon="OpenFile" Label="Load EVTX" Click="LoadEvtxFile_Click" />
-                <AppBarButton Icon="OpenFile" Label="Load XML" Click="LoadXmlFile_Click" />
-                <AppBarButton Icon="OpenFile" Label="Load ETL" Click="LoadEtlFile_Click" />
+                <AppBarButton x:Name="LoadXmlButton" Icon="OpenFile" Label="Load XML"
+                              Click="LoadXmlFile_Click"
+                              Visibility="Collapsed"
+                              ToolTipService.ToolTip="Load XML (experimental — not all event formats parse cleanly)" />
+                <AppBarButton x:Name="LoadEtlButton" Icon="OpenFile" Label="Load ETL"
+                              Click="LoadEtlFile_Click"
+                              Visibility="Collapsed"
+                              ToolTipService.ToolTip="Load ETL (experimental — kernel/provider traces may render with limited detail)" />
             </CommandBar>
             <Button Grid.Column="1" Click="SettingsButton_Click" Padding="8" VerticalAlignment="Center" Margin="0,0,8,0"
                     ToolTipService.ToolTip="Settings">

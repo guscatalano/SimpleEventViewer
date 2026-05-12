@@ -1,6 +1,6 @@
 # Simple Event Viewer
 
-A modern Windows Event Log viewer built with **WinUI 3** and the Windows App SDK. Reads live system event logs and saved `.evtx` / `.xml` files, with rich filtering, sorting, and copy/export options.
+A modern Windows Event Log viewer built with **WinUI 3** and the Windows App SDK. Reads live system event logs and saved `.evtx` files (with experimental support for `.xml` and `.etl`), and exposes rich filtering, sorting, copy/export, and an optional local MCP server.
 
 ![App icon](Assets/AppIcon.png)
 
@@ -9,8 +9,8 @@ A modern Windows Event Log viewer built with **WinUI 3** and the Windows App SDK
 ### Data sources
 - **Live system logs** (Application channel) via `EventLogReader`
 - **EVTX files** (`.evtx`) — native read via `EventLogReader` with `PathType.FilePath`
-- **XML files** (`.xml`) — parsed events from saved event XML
-- **ETL files** (`.etl`) — converted via `wevtutil`
+- **XML files** (`.xml`) *(experimental)* — parsed events from saved event XML; only `wevtutil qe ... /f:xml` output is reliably supported
+- **ETL files** (`.etl`) *(experimental)* — read via `EventLogReader`; kernel/provider traces may render with limited detail
 
 The current source is shown in the status bar (e.g. "Live system logs" or "MyExport.evtx").
 
@@ -67,11 +67,41 @@ Right-click on a row (or selection) for:
 ### Settings
 Available via the gear icon in the toolbar:
 - **Theme** — System / Light / Dark
-- **Color scheme** — Default, Blue, Green, Purple, Orange, Red (drives the level badges and row tints)
+- **Color scheme** — Default, Blue, Green, Purple, Orange, Red. Drives the level badges *and* app-wide accent colors (buttons, focus rings, DataGrid selection highlight)
 - **Row color style** — Badge only / Entire row
 - **Message lines** — 1, 2, 3, 4, 5, or 10 line cap per row
+- **Remember column widths** — DataGrid column widths are restored on next launch (on by default)
+- **MCP server** — toggle a local Model Context Protocol server (see below); port is configurable, default 7321
 
 All settings persist to `ApplicationData.Current.LocalSettings`.
+
+### MCP server (Model Context Protocol)
+Optional in-process server that exposes the currently-loaded events to an LLM client over local HTTP+JSON-RPC. Enable it from **Settings → MCP Server**.
+
+- Bound to `127.0.0.1` only — not reachable from the network
+- Default port: `7321`
+- Single endpoint: `POST http://127.0.0.1:<port>/` accepts JSON-RPC 2.0 messages
+- Supported methods: `initialize`, `tools/list`, `tools/call`, `ping`
+
+Available tools:
+
+| Tool | Description |
+|---|---|
+| `current_source` | Returns the label of whatever is currently loaded (e.g. `Live system logs` or a filename) and the total event count |
+| `event_summary` | Returns total + counts broken down by level (Critical / Error / Warning / Information / Verbose) |
+| `list_events` | Newest-first slice of events with `limit`, `offset`, optional `level` / `source` filters |
+| `search_events` | Case-insensitive substring search across event messages |
+| `get_event` | Full details of a specific event by its newest-first index |
+
+Quick sanity check from a shell:
+
+```pwsh
+curl http://127.0.0.1:7321/
+# {"server":"SimpleEventViewer","version":"1.0.0",...}
+
+curl -X POST http://127.0.0.1:7321/ -H "Content-Type: application/json" `
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
 
 ## Architecture
 

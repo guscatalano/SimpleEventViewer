@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using SimpleEventViewer.Services;
+using SimpleEventViewer.Services.Mcp;
 using Windows.UI;
 
 namespace SimpleEventViewer;
@@ -17,6 +18,16 @@ public sealed partial class SettingsPage : Page
 
     private void SettingsPage_Loaded(object sender, RoutedEventArgs e)
     {
+        try
+        {
+            var v = Windows.ApplicationModel.Package.Current.Id.Version;
+            AppVersionText.Text = $"Version {v.Major}.{v.Minor}.{v.Build}";
+        }
+        catch
+        {
+            AppVersionText.Text = "Version 1.0.0";
+        }
+
         var theme = SettingsService.Instance.Theme;
         ThemeComboBox.SelectedIndex = (int)theme;
 
@@ -32,9 +43,124 @@ public sealed partial class SettingsPage : Page
 
         RowColorModeComboBox.SelectedIndex = (int)SettingsService.Instance.RowColorMode;
         MaxRowLinesComboBox.SelectedIndex = SettingsService.Instance.MaxRowLines == 2 ? 1 : 0;
+        RememberColumnWidthsSwitch.IsOn = SettingsService.Instance.RememberColumnWidths;
+        ExperimentalFormatsSwitch.IsOn = SettingsService.Instance.ExperimentalFileFormats;
+
+        // MCP server
+        _initializingMcp = true;
+        McpEnabledSwitch.IsOn = SettingsService.Instance.McpServerEnabled;
+        McpPortBox.Value = SettingsService.Instance.McpServerPort;
+        _initializingMcp = false;
+        RefreshMcpStatus();
 
         UpdateSwatches(color);
     }
+
+    private void RememberColumnWidthsSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        SettingsService.Instance.RememberColumnWidths = RememberColumnWidthsSwitch.IsOn;
+    }
+
+    private void ExperimentalFormatsSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        SettingsService.Instance.ExperimentalFileFormats = ExperimentalFormatsSwitch.IsOn;
+    }
+
+    // Guard the NumberBox + ToggleSwitch event handlers from firing while we
+    // hydrate them in SettingsPage_Loaded.
+    private bool _initializingMcp;
+
+    private void McpEnabledSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_initializingMcp) return;
+        SettingsService.Instance.McpServerEnabled = McpEnabledSwitch.IsOn;
+        EventLogMcpServer.Instance.ApplyConfiguration(
+            SettingsService.Instance.McpServerEnabled,
+            SettingsService.Instance.McpServerPort);
+        RefreshMcpStatus();
+    }
+
+    private void McpPortBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (_initializingMcp) return;
+        if (double.IsNaN(args.NewValue)) return;
+        var port = (int)args.NewValue;
+        if (port < 1024 || port > 65535) return;
+        SettingsService.Instance.McpServerPort = port;
+        if (SettingsService.Instance.McpServerEnabled)
+        {
+            EventLogMcpServer.Instance.ApplyConfiguration(true, port);
+        }
+        RefreshMcpStatus();
+    }
+
+    private void RefreshMcpStatus()
+    {
+        var running = EventLogMcpServer.Instance.IsRunning;
+        var port = SettingsService.Instance.McpServerPort;
+        if (running)
+        {
+            McpStatusText.Text = $"Running on 127.0.0.1:{port}";
+            McpEndpointText.Text = $"Endpoint: http://127.0.0.1:{port}/";
+        }
+        else if (SettingsService.Instance.McpServerEnabled)
+        {
+            McpStatusText.Text = "Enabled, but listener is not running (port may be in use)";
+            McpEndpointText.Text = string.Empty;
+        }
+        else
+        {
+            McpStatusText.Text = "Off — no port is open";
+            McpEndpointText.Text = string.Empty;
+        }
+
+        // Refresh client config snippets with the current port.
+        var url = $"http://127.0.0.1:{port}/";
+
+        VsCodeConfigBox.Text =
+            "{\r\n" +
+            "  \"servers\": {\r\n" +
+            "    \"simple-event-viewer\": {\r\n" +
+            "      \"type\": \"http\",\r\n" +
+            $"      \"url\": \"{url}\"\r\n" +
+            "    }\r\n" +
+            "  }\r\n" +
+            "}";
+
+        CursorConfigBox.Text =
+            "{\r\n" +
+            "  \"mcpServers\": {\r\n" +
+            "    \"simple-event-viewer\": {\r\n" +
+            $"      \"url\": \"{url}\"\r\n" +
+            "    }\r\n" +
+            "  }\r\n" +
+            "}";
+
+        ClaudeDesktopConfigBox.Text =
+            "{\r\n" +
+            "  \"mcpServers\": {\r\n" +
+            "    \"simple-event-viewer\": {\r\n" +
+            "      \"command\": \"npx\",\r\n" +
+            $"      \"args\": [\"mcp-remote\", \"{url}\"]\r\n" +
+            "    }\r\n" +
+            "  }\r\n" +
+            "}";
+
+        ClaudeCodeCommandBox.Text =
+            $"claude mcp add --transport http simple-event-viewer {url}";
+    }
+
+    private static void CopyToClipboard(string text)
+    {
+        var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+        dp.SetText(text);
+        Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
+    }
+
+    private void CopyVsCodeConfig_Click(object sender, RoutedEventArgs e) => CopyToClipboard(VsCodeConfigBox.Text);
+    private void CopyCursorConfig_Click(object sender, RoutedEventArgs e) => CopyToClipboard(CursorConfigBox.Text);
+    private void CopyClaudeDesktopConfig_Click(object sender, RoutedEventArgs e) => CopyToClipboard(ClaudeDesktopConfigBox.Text);
+    private void CopyClaudeCodeCommand_Click(object sender, RoutedEventArgs e) => CopyToClipboard(ClaudeCodeCommandBox.Text);
 
     private void MaxRowLinesComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -56,25 +182,48 @@ public sealed partial class SettingsPage : Page
         }
     }
 
-    private void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (ThemeComboBox.SelectedItem is ComboBoxItem item && item.Tag != null)
         {
             if (int.TryParse(item.Tag.ToString(), out var themeValue))
             {
-                SettingsService.Instance.Theme = (AppTheme)themeValue;
+                await RunWithBusyOverlayAsync("Applying theme…", () =>
+                {
+                    SettingsService.Instance.Theme = (AppTheme)themeValue;
+                });
             }
         }
     }
 
-    private void ColorSchemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void ColorSchemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (ColorSchemeComboBox.SelectedItem is ComboBoxItem item && item.Tag != null)
         {
             var colorName = item.Tag.ToString() ?? "Default";
-            SettingsService.Instance.AccentColor = colorName;
+            await RunWithBusyOverlayAsync("Applying color scheme…", () =>
+            {
+                SettingsService.Instance.AccentColor = colorName;
+            });
             UpdateSwatches(colorName);
         }
+    }
+
+    /// <summary>
+    /// Show the overlay, yield to the dispatcher so the spinner paints, run
+    /// the work, then hide the overlay. Setting RequestedTheme on the root
+    /// element and the cascading row-color refresh both run on the UI thread,
+    /// so this is "make the freeze obvious" rather than truly async — but it
+    /// keeps the user from thinking the app hung.
+    /// </summary>
+    private async System.Threading.Tasks.Task RunWithBusyOverlayAsync(string message, Action work)
+    {
+        BusyText.Text = message;
+        BusyOverlay.Visibility = Visibility.Visible;
+        await System.Threading.Tasks.Task.Delay(20);
+        try { work(); } catch { }
+        await System.Threading.Tasks.Task.Delay(20);
+        BusyOverlay.Visibility = Visibility.Collapsed;
     }
 
     private void UpdateSwatches(string colorScheme)
@@ -101,6 +250,23 @@ public sealed partial class SettingsPage : Page
 
 public static class ColorSchemes
 {
+    /// <summary>
+    /// The single "primary" accent color for this scheme. Used to drive
+    /// SystemAccentColor app-wide (buttons, links, selection highlight).
+    /// </summary>
+    public static Color GetAccentColor(string scheme)
+    {
+        return scheme switch
+        {
+            "Blue"   => Color.FromArgb(255,   0, 120, 212),
+            "Green"  => Color.FromArgb(255,  56, 142,  60),
+            "Purple" => Color.FromArgb(255, 123,  31, 162),
+            "Orange" => Color.FromArgb(255, 230,  81,   0),
+            "Red"    => Color.FromArgb(255, 211,  47,  47),
+            _        => Color.FromArgb(255,   0, 120, 212) // Windows default-ish
+        };
+    }
+
     public static (Color critical, Color error, Color warning, Color info) GetColors(string scheme)
     {
         return scheme switch

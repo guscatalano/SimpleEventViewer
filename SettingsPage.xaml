@@ -8,6 +8,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
+    <Grid>
     <ScrollViewer>
         <StackPanel Padding="24" Spacing="16" MaxWidth="800" HorizontalAlignment="Stretch">
 
@@ -38,6 +39,11 @@
                             <ComboBoxItem Content="System default" Tag="0" />
                             <ComboBoxItem Content="Light" Tag="1" />
                             <ComboBoxItem Content="Dark" Tag="2" />
+                            <ComboBoxItem Content="High Contrast" Tag="3" />
+                            <ComboBoxItem Content="Nord (dark)" Tag="4" />
+                            <ComboBoxItem Content="Dracula (dark)" Tag="5" />
+                            <ComboBoxItem Content="Solarized (dark)" Tag="6" />
+                            <ComboBoxItem Content="Sepia (light)" Tag="7" />
                         </ComboBox>
                     </Grid>
 
@@ -48,7 +54,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Color Scheme" FontWeight="SemiBold" />
-                            <TextBlock Text="Choose accent color for highlights and errors" Opacity="0.7" FontSize="12" />
+                            <TextBlock Text="Accent color used app-wide (buttons, selection, badges)" Opacity="0.7" FontSize="12" />
                         </StackPanel>
                         <ComboBox Grid.Column="1" x:Name="ColorSchemeComboBox" SelectionChanged="ColorSchemeComboBox_SelectionChanged" Width="200">
                             <ComboBoxItem Content="Default" Tag="Default" />
@@ -94,6 +100,19 @@
                         </ComboBox>
                     </Grid>
 
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Remember Column Widths" FontWeight="SemiBold" />
+                            <TextBlock Text="Restore DataGrid column widths when relaunching the app" Opacity="0.7" FontSize="12" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" x:Name="RememberColumnWidthsSwitch"
+                                      Toggled="RememberColumnWidthsSwitch_Toggled" />
+                    </Grid>
+
                     <!-- Preview swatches -->
                     <StackPanel Spacing="8" Margin="0,8,0,0">
                         <TextBlock Text="Color Preview" FontWeight="SemiBold" />
@@ -115,6 +134,166 @@
                 </StackPanel>
             </Border>
 
+            <!-- Experimental Card -->
+            <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="20">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Experimental features" FontSize="18" FontWeight="SemiBold" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Load XML / ETL files" FontWeight="SemiBold" />
+                            <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+                                       Text="Adds toolbar buttons for loading .xml and .etl files. These code paths are lightly tested and may render certain event formats with reduced detail." />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" x:Name="ExperimentalFormatsSwitch"
+                                      Toggled="ExperimentalFormatsSwitch_Toggled" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- MCP Server Card -->
+            <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="20">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="MCP Server" FontSize="18" FontWeight="SemiBold" />
+                    <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+                               Text="Exposes the currently-loaded events to a local Model Context Protocol client (LLM tools) over HTTP+JSON-RPC, bound to 127.0.0.1 only." />
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Enable local MCP server" FontWeight="SemiBold" />
+                            <TextBlock x:Name="McpStatusText" Opacity="0.7" FontSize="12" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" x:Name="McpEnabledSwitch"
+                                      Toggled="McpEnabledSwitch_Toggled" />
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Port" FontWeight="SemiBold" />
+                            <TextBlock Text="Local port the server binds to (default 7321)" Opacity="0.7" FontSize="12" />
+                        </StackPanel>
+                        <NumberBox Grid.Column="1" x:Name="McpPortBox"
+                                   Minimum="1024" Maximum="65535"
+                                   SpinButtonPlacementMode="Compact"
+                                   ValueChanged="McpPortBox_ValueChanged"
+                                   Width="160" />
+                    </Grid>
+
+                    <TextBlock x:Name="McpEndpointText" FontSize="12" Opacity="0.8" FontFamily="Consolas" />
+
+                    <!-- Client configuration examples -->
+                    <StackPanel Spacing="12" Margin="0,8,0,0">
+                        <TextBlock Text="Client configuration" FontWeight="SemiBold" />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+                                   Text="Drop these snippets into your MCP client's config to connect to the running server. Updates automatically when the port changes." />
+
+                        <!-- VS Code -->
+                        <StackPanel Spacing="4">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="VS Code &#x2014; .vscode/mcp.json" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Click="CopyVsCodeConfig_Click" Padding="6"
+                                        Background="Transparent" BorderThickness="0"
+                                        ToolTipService.ToolTip="Copy">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <FontIcon Glyph="&#xE8C8;" FontSize="12" />
+                                        <TextBlock Text="Copy" FontSize="12" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <TextBox x:Name="VsCodeConfigBox" IsReadOnly="True" AcceptsReturn="True"
+                                     TextWrapping="NoWrap" FontFamily="Consolas" FontSize="11"
+                                     IsSpellCheckEnabled="False" Height="120" />
+                        </StackPanel>
+
+                        <!-- Cursor -->
+                        <StackPanel Spacing="4">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Cursor &#x2014; ~/.cursor/mcp.json" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Click="CopyCursorConfig_Click" Padding="6"
+                                        Background="Transparent" BorderThickness="0"
+                                        ToolTipService.ToolTip="Copy">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <FontIcon Glyph="&#xE8C8;" FontSize="12" />
+                                        <TextBlock Text="Copy" FontSize="12" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <TextBox x:Name="CursorConfigBox" IsReadOnly="True" AcceptsReturn="True"
+                                     TextWrapping="NoWrap" FontFamily="Consolas" FontSize="11"
+                                     IsSpellCheckEnabled="False" Height="120" />
+                        </StackPanel>
+
+                        <!-- Claude Desktop -->
+                        <StackPanel Spacing="4">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Claude Desktop &#x2014; claude_desktop_config.json" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Click="CopyClaudeDesktopConfig_Click" Padding="6"
+                                        Background="Transparent" BorderThickness="0"
+                                        ToolTipService.ToolTip="Copy">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <FontIcon Glyph="&#xE8C8;" FontSize="12" />
+                                        <TextBlock Text="Copy" FontSize="12" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <TextBox x:Name="ClaudeDesktopConfigBox" IsReadOnly="True" AcceptsReturn="True"
+                                     TextWrapping="NoWrap" FontFamily="Consolas" FontSize="11"
+                                     IsSpellCheckEnabled="False" Height="140" />
+                            <TextBlock Text="Claude Desktop currently bridges HTTP MCP servers through mcp-remote (requires Node.js)." Opacity="0.7" FontSize="11" TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <!-- Claude Code -->
+                        <StackPanel Spacing="4">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Claude Code &#x2014; CLI" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Click="CopyClaudeCodeCommand_Click" Padding="6"
+                                        Background="Transparent" BorderThickness="0"
+                                        ToolTipService.ToolTip="Copy">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <FontIcon Glyph="&#xE8C8;" FontSize="12" />
+                                        <TextBlock Text="Copy" FontSize="12" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <TextBox x:Name="ClaudeCodeCommandBox" IsReadOnly="True" AcceptsReturn="True"
+                                     TextWrapping="NoWrap" FontFamily="Consolas" FontSize="11"
+                                     IsSpellCheckEnabled="False" Height="40" />
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
             <!-- About Card -->
             <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
@@ -123,6 +302,7 @@
                     <TextBlock Text="About" FontSize="18" FontWeight="SemiBold" />
                     <TextBlock Text="Simple Event Viewer" />
                     <TextBlock Text="A modern Windows Event Log viewer built with WinUI 3" Opacity="0.7" FontSize="12" />
+                    <TextBlock x:Name="AppVersionText" Opacity="0.7" FontSize="12" />
                     <TextBlock Text="" Margin="0,8,0,0" />
                     <TextBlock Text="Created by Gus Catalano" FontWeight="SemiBold" />
                     <TextBlock Text="gus@guscatalano.com" Opacity="0.7" FontSize="12" />
@@ -131,4 +311,16 @@
 
         </StackPanel>
     </ScrollViewer>
+
+    <!-- Busy overlay shown while a heavy operation (theme apply, accent
+         apply) runs. Sits above all content and intercepts pointer input. -->
+    <Border x:Name="BusyOverlay" Visibility="Collapsed"
+            Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}"
+            Opacity="0.85">
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+            <ProgressRing IsActive="True" Width="48" Height="48" />
+            <TextBlock x:Name="BusyText" Text="Applying theme…" HorizontalAlignment="Center" />
+        </StackPanel>
+    </Border>
+    </Grid>
 </Page>

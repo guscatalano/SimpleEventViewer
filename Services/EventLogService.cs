@@ -19,6 +19,14 @@ public class EventLogService
     private readonly ConcurrentDictionary<string, int> _channelCounts = new();
 
     public IReadOnlyList<EventLogEntry> Events => _events.ToList().AsReadOnly();
+
+    /// <summary>
+    /// Human-readable label for whatever was last loaded (e.g. "Live system logs"
+    /// or a filename). Mirrors what's shown in the UI status bar; exposed so the
+    /// MCP server can report it. Defaults to "Live system logs" since that's
+    /// what the app auto-loads on launch.
+    /// </summary>
+    public string CurrentSource { get; set; } = "Live system logs";
     public IReadOnlyDictionary<string, int> SourceCounts => _sourceCounts.ToDictionary(k => k.Key, v => v.Value);
     public IReadOnlyDictionary<string, int> ProcessCounts => _processCounts.ToDictionary(k => k.Key, v => v.Value);
     public IReadOnlyDictionary<string, int> UserCounts => _userCounts.ToDictionary(k => k.Key, v => v.Value);

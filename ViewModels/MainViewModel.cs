@@ -275,7 +275,13 @@ public partial class MainViewModel : ObservableObject
     public string CurrentSource
     {
         get => _currentSource;
-        set => SetProperty(ref _currentSource, value);
+        set
+        {
+            if (SetProperty(ref _currentSource, value))
+            {
+                EventLogService.Instance.CurrentSource = value;
+            }
+        }
     }
 
     public SourceCategory? SelectedSource
