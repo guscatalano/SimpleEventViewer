@@ -1,5 +1,5 @@
-using SimpleEventViewer_WinUI.Models;
-using SimpleEventViewer_WinUI.Services;
+using SimpleEventViewer.Models;
+using SimpleEventViewer.Services;
 
 namespace SimpleEventViewer.Tests;
 

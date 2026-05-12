@@ -1,4 +1,4 @@
-namespace SimpleEventViewer_WinUI.Models;
+namespace SimpleEventViewer.Models;
 
 public class EventLogEntry
 {

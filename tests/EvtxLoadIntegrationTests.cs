@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using SimpleEventViewer_WinUI.Services;
+using SimpleEventViewer.Services;
 
 namespace SimpleEventViewer.Tests;
 

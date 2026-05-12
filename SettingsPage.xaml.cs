@@ -2,10 +2,10 @@ using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
-using SimpleEventViewer_WinUI.Services;
+using SimpleEventViewer.Services;
 using Windows.UI;
 
-namespace SimpleEventViewer_WinUI;
+namespace SimpleEventViewer;
 
 public sealed partial class SettingsPage : Page
 {

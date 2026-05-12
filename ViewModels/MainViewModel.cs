@@ -1,13 +1,13 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using SimpleEventViewer_WinUI.Models;
-using SimpleEventViewer_WinUI.Services;
+using SimpleEventViewer.Models;
+using SimpleEventViewer.Services;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 
-namespace SimpleEventViewer_WinUI.ViewModels;
+namespace SimpleEventViewer.ViewModels;
 
 public partial class MainViewModel : ObservableObject
 {

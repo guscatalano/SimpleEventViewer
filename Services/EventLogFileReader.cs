@@ -1,8 +1,8 @@
 using System.Diagnostics.Eventing.Reader;
 using System.Runtime.Versioning;
-using SimpleEventViewer_WinUI.Models;
+using SimpleEventViewer.Models;
 
-namespace SimpleEventViewer_WinUI.Services;
+namespace SimpleEventViewer.Services;
 
 /// <summary>
 /// Pure file-reading logic for .evtx and .etl files. Separated from EventLogService

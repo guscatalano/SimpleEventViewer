@@ -1,7 +1,7 @@
 using Microsoft.UI.Xaml;
 using Windows.Storage;
 
-namespace SimpleEventViewer_WinUI.Services;
+namespace SimpleEventViewer.Services;
 
 public enum AppTheme
 {

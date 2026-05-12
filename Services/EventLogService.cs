@@ -1,10 +1,10 @@
 using System.Collections.Concurrent;
 using System.IO;
 using System.Xml;
-using SimpleEventViewer_WinUI.Models;
+using SimpleEventViewer.Models;
 using System.Diagnostics.Eventing.Reader;
 
-namespace SimpleEventViewer_WinUI.Services;
+namespace SimpleEventViewer.Services;
 
 public class EventLogService
 {

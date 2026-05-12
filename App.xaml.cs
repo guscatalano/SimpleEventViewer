@@ -1,4 +1,4 @@
-﻿using Windows.ApplicationModel;
+using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
@@ -14,7 +14,7 @@ using Microsoft.UI.Xaml.Shapes;
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
 
-namespace SimpleEventViewer_WinUI;
+namespace SimpleEventViewer;
 
 /// <summary>
 /// Provides application-specific behavior to supplement the default Application class.
@@ -22,6 +22,12 @@ namespace SimpleEventViewer_WinUI;
 public partial class App : Application
 {
     public Window? MainWindow { get; private set; }
+
+    /// <summary>
+    /// File path passed on the command line, if any. The MainPage reads this
+    /// after construction and triggers a file load.
+    /// </summary>
+    public string? StartupFilePath { get; private set; }
 
     /// <summary>
     /// Initializes the singleton application object.  This is the first line of authored code
@@ -38,11 +44,63 @@ public partial class App : Application
     /// <param name="args">Details about the launch request and process.</param>
     protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
+        StartupFilePath = ParseFilePathFromArgs();
+
+        if (StartupFilePath != null && HandleCliOnly())
+        {
+            Exit();
+            return;
+        }
+
         MainWindow = new MainWindow();
         MainWindow.Activate();
 
         // Apply saved theme
-        SimpleEventViewer_WinUI.Services.SettingsService.Instance.ApplyTheme(
-            SimpleEventViewer_WinUI.Services.SettingsService.Instance.Theme);
+        SimpleEventViewer.Services.SettingsService.Instance.ApplyTheme(
+            SimpleEventViewer.Services.SettingsService.Instance.Theme);
     }
+
+    /// <summary>
+    /// Parse args to find a file path. Accepts:
+    ///   SimpleEventViewer.exe path\to\file.evtx
+    ///   SimpleEventViewer.exe --file path\to\file.evtx
+    /// </summary>
+    private static string? ParseFilePathFromArgs()
+    {
+        try
+        {
+            var args = Environment.GetCommandLineArgs();
+            // args[0] is the exe path
+            for (int i = 1; i < args.Length; i++)
+            {
+                var a = args[i];
+                if (a is "--file" or "-f" or "/f")
+                {
+                    if (i + 1 < args.Length) return args[i + 1];
+                }
+                else if (a is "--help" or "-h" or "/?" or "/help")
+                {
+                    // No-op; the help text would only matter if we had a console.
+                    return null;
+                }
+                else if (!a.StartsWith('-') && !a.StartsWith('/'))
+                {
+                    // Positional file path
+                    if (System.IO.File.Exists(a)) return a;
+                    // If the file doesn't exist, still pass it so the VM can show
+                    // an error in the UI rather than silently dropping the arg.
+                    return a;
+                }
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>
+    /// Placeholder for a future "headless mode" where we'd print events without
+    /// showing the UI. Currently always returns false — the file is loaded via
+    /// the regular UI after the window is shown.
+    /// </summary>
+    private bool HandleCliOnly() => false;
 }

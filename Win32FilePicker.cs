@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace SimpleEventViewer_WinUI;
+namespace SimpleEventViewer;
 
 /// <summary>
 /// Win32 IFileOpenDialog wrapper. The WinUI 3 FileOpenPicker is unreliable for

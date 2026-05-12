@@ -4,16 +4,16 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
-using SimpleEventViewer_WinUI.Models;
-using SimpleEventViewer_WinUI.Services;
-using SimpleEventViewer_WinUI.ViewModels;
+using SimpleEventViewer.Models;
+using SimpleEventViewer.Services;
+using SimpleEventViewer.ViewModels;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
 using Windows.ApplicationModel.DataTransfer;
 using WinRT.Interop;
 
-namespace SimpleEventViewer_WinUI;
+namespace SimpleEventViewer;
 
 public sealed partial class MainPage : Page
 {
@@ -29,6 +29,27 @@ public sealed partial class MainPage : Page
 
         // Refresh row colors when theme/color scheme changes
         SettingsService.Instance.ThemeChanged += OnThemeChanged;
+
+        // If a file was passed on the command line, load it after the page is ready.
+        Loaded += MainPage_Loaded;
+    }
+
+    private void MainPage_Loaded(object sender, RoutedEventArgs e)
+    {
+        Loaded -= MainPage_Loaded;
+        var startupFile = (Application.Current as App)?.StartupFilePath;
+        if (!string.IsNullOrEmpty(startupFile))
+        {
+            var ext = System.IO.Path.GetExtension(startupFile).TrimStart('.').ToLowerInvariant();
+            if (ext is "evtx" or "xml" or "etl")
+            {
+                ViewModel.LoadFile(startupFile, ext);
+            }
+            else
+            {
+                ViewModel.StatusMessage = $"Unsupported file type: .{ext}";
+            }
+        }
     }
 
     private string? _rightClickedCellValue;
