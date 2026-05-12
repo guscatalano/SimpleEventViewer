@@ -11,6 +11,7 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="System.Diagnostics.EventLog" Version="10.0.7" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
@@ -27,6 +28,7 @@
     <Compile Include="..\Models\EventLevel.cs" Link="Models\EventLevel.cs" />
     <Compile Include="..\Models\EventLogEntry.cs" Link="Models\EventLogEntry.cs" />
     <Compile Include="..\Services\EventFilter.cs" Link="Services\EventFilter.cs" />
+    <Compile Include="..\Services\EventLogFileReader.cs" Link="Services\EventLogFileReader.cs" />
   </ItemGroup>
 
 </Project>

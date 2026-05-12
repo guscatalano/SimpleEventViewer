@@ -260,34 +260,19 @@ public class EventLogService
         _computerCounts.Clear();
         _channelCounts.Clear();
 
-        var query = new EventLogQuery(filePath, PathType.FilePath, "*")
-        {
-            ReverseDirection = true
-        };
-
-        using var reader = new EventLogReader(query);
-
         const int batchSize = 100;
         var batch = new List<EventLogEntry>(batchSize);
 
-        while (true)
+        foreach (var entry in EventLogFileReader.Read(filePath))
         {
-            var entry = reader.ReadEvent();
-            if (entry == null) break;
+            _events.Add(entry);
+            batch.Add(entry);
+            TrackCounts(entry);
 
-            var logEntry = ConvertToEntry(entry);
-            if (logEntry != null)
+            if (batch.Count >= batchSize)
             {
-                logEntry.IsSystemLog = false;
-                _events.Add(logEntry);
-                batch.Add(logEntry);
-                TrackCounts(logEntry);
-
-                if (batch.Count >= batchSize)
-                {
-                    OnEventBatchLoaded?.Invoke(batch);
-                    batch = new List<EventLogEntry>(batchSize);
-                }
+                OnEventBatchLoaded?.Invoke(batch);
+                batch = new List<EventLogEntry>(batchSize);
             }
         }
 
