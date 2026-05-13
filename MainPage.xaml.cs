@@ -31,6 +31,17 @@ public sealed partial class MainPage : Page
         SettingsService.Instance.ThemeChanged += OnThemeChanged;
         SettingsService.Instance.ExperimentalFormatsChanged += OnExperimentalFormatsChanged;
         SettingsService.Instance.ColumnVisibilityChanged += OnColumnVisibilityChanged;
+        SettingsService.Instance.TitleFormatChanged += OnTitleFormatChanged;
+
+        // Mirror the loaded source into the title bar so multiple open windows
+        // can be told apart from the taskbar / Alt-Tab.
+        ViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainViewModel.CurrentSource))
+            {
+                UpdateWindowTitle();
+            }
+        };
 
         // If a file was passed on the command line, load it after the page is ready.
         Loaded += MainPage_Loaded;
@@ -46,11 +57,24 @@ public sealed partial class MainPage : Page
         DispatcherQueue.TryEnqueue(RestoreColumnVisibility);
     }
 
+    private void OnTitleFormatChanged()
+    {
+        DispatcherQueue.TryEnqueue(UpdateWindowTitle);
+    }
+
+    private void UpdateWindowTitle()
+    {
+        if (Application.Current is App app && app.MainWindow is MainWindow mw)
+        {
+            mw.UpdateTitleBar(ViewModel.CurrentSource ?? string.Empty);
+        }
+    }
+
     private void UpdateExperimentalButtons()
     {
         var on = SettingsService.Instance.ExperimentalFileFormats;
-        LoadXmlButton.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-        LoadEtlButton.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        LoadXmlMenuItem.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        LoadEtlMenuItem.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void MainPage_Loaded(object sender, RoutedEventArgs e)
@@ -60,6 +84,7 @@ public sealed partial class MainPage : Page
         RestoreColumnWidths();
         RestoreColumnVisibility();
         UpdateExperimentalButtons();
+        UpdateWindowTitle();
 
         var startupFile = (Application.Current as App)?.StartupFilePath;
         if (!string.IsNullOrEmpty(startupFile))
@@ -291,7 +316,7 @@ public sealed partial class MainPage : Page
 
     private void LoadLocalEventLog_Click(object sender, RoutedEventArgs e)
     {
-        ViewModel.RefreshCurrentView();
+        ViewModel.LoadLiveLogs();
     }
 
     private void LoadEvtxFile_Click(object sender, RoutedEventArgs e)
@@ -346,6 +371,55 @@ public sealed partial class MainPage : Page
         ViewModel.StartTimeOfDay = TimeSpan.Zero;
         ViewModel.EndTimeOfDay = new TimeSpan(23, 59, 59);
         ViewModel.SearchText = string.Empty;
+    }
+
+    private void SaveFilters_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var window = (Application.Current as App)?.MainWindow;
+            var hwnd = window != null ? WindowNative.GetWindowHandle(window) : IntPtr.Zero;
+
+            var defaultName = $"filters-{DateTime.Now:yyyyMMdd-HHmmss}.json";
+            var path = Win32FilePicker.SaveFile(hwnd, "Save filters", defaultName,
+                new[] { ("Filter preset", ".json") });
+            if (string.IsNullOrEmpty(path)) return;
+
+            var snapshot = ViewModel.CaptureFilters();
+            var json = FilterPersistence.Serialize(snapshot);
+            System.IO.File.WriteAllText(path, json);
+            ViewModel.StatusMessage = $"Saved filters to {System.IO.Path.GetFileName(path)}";
+        }
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage = $"Save filters failed: {ex.Message}";
+        }
+    }
+
+    private void LoadFilters_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var window = (Application.Current as App)?.MainWindow;
+            var hwnd = window != null ? WindowNative.GetWindowHandle(window) : IntPtr.Zero;
+
+            var path = Win32FilePicker.PickFile(hwnd, "Load filters", "Filter preset", ".json");
+            if (string.IsNullOrEmpty(path)) return;
+
+            var json = System.IO.File.ReadAllText(path);
+            var snapshot = FilterPersistence.Deserialize(json);
+            if (snapshot == null)
+            {
+                ViewModel.StatusMessage = "Couldn't parse filter file";
+                return;
+            }
+            ViewModel.ApplyFilterSnapshot(snapshot);
+            ViewModel.StatusMessage = $"Loaded filters from {System.IO.Path.GetFileName(path)}";
+        }
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage = $"Load filters failed: {ex.Message}";
+        }
     }
 
     private void SettingsButton_Click(object sender, RoutedEventArgs e)

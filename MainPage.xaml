@@ -26,18 +26,43 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <CommandBar Grid.Column="0" DefaultLabelPosition="Right" HorizontalAlignment="Left" Background="Transparent">
-                <AppBarButton Icon="Admin" Label="Load Local Event Log" Click="LoadLocalEventLog_Click" />
-                <AppBarButton Icon="Refresh" Label="Refresh" Click="RefreshButton_Click" />
-                <AppBarSeparator />
-                <AppBarButton Icon="OpenFile" Label="Load EVTX" Click="LoadEvtxFile_Click" />
-                <AppBarButton x:Name="LoadXmlButton" Icon="OpenFile" Label="Load XML"
-                              Click="LoadXmlFile_Click"
-                              Visibility="Collapsed"
-                              ToolTipService.ToolTip="Load XML (experimental — not all event formats parse cleanly)" />
-                <AppBarButton x:Name="LoadEtlButton" Icon="OpenFile" Label="Load ETL"
-                              Click="LoadEtlFile_Click"
-                              Visibility="Collapsed"
-                              ToolTipService.ToolTip="Load ETL (experimental — kernel/provider traces may render with limited detail)" />
+                <AppBarButton Icon="OpenFile" Label="Open"
+                              ToolTipService.ToolTip="Choose a data source to load">
+                    <AppBarButton.Flyout>
+                        <MenuFlyout>
+                            <MenuFlyoutItem Text="Live Windows event log" Click="LoadLocalEventLog_Click">
+                                <MenuFlyoutItem.Icon>
+                                    <SymbolIcon Symbol="Admin" />
+                                </MenuFlyoutItem.Icon>
+                            </MenuFlyoutItem>
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Text="EVTX file…" Click="LoadEvtxFile_Click">
+                                <MenuFlyoutItem.Icon>
+                                    <SymbolIcon Symbol="OpenFile" />
+                                </MenuFlyoutItem.Icon>
+                            </MenuFlyoutItem>
+                            <MenuFlyoutItem x:Name="LoadXmlMenuItem"
+                                            Text="XML file… (experimental)"
+                                            Click="LoadXmlFile_Click"
+                                            Visibility="Collapsed">
+                                <MenuFlyoutItem.Icon>
+                                    <SymbolIcon Symbol="OpenFile" />
+                                </MenuFlyoutItem.Icon>
+                            </MenuFlyoutItem>
+                            <MenuFlyoutItem x:Name="LoadEtlMenuItem"
+                                            Text="ETL file… (experimental)"
+                                            Click="LoadEtlFile_Click"
+                                            Visibility="Collapsed">
+                                <MenuFlyoutItem.Icon>
+                                    <SymbolIcon Symbol="OpenFile" />
+                                </MenuFlyoutItem.Icon>
+                            </MenuFlyoutItem>
+                        </MenuFlyout>
+                    </AppBarButton.Flyout>
+                </AppBarButton>
+                <AppBarButton Icon="Refresh" Label="{x:Bind ViewModel.RefreshButtonLabel, Mode=OneWay}"
+                              Click="RefreshButton_Click"
+                              ToolTipService.ToolTip="Re-read the current source (live or file) and re-apply the active filters" />
             </CommandBar>
             <Button Grid.Column="1" Click="SettingsButton_Click" Padding="8" VerticalAlignment="Center" Margin="0,0,8,0"
                     ToolTipService.ToolTip="Settings">
@@ -86,14 +111,29 @@
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
                         <StackPanel Padding="16,4,16,16" Spacing="16">
                             <StackPanel Spacing="6">
-                                <TextBlock Text="Event Source" FontWeight="SemiBold" FontSize="13" />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Border Width="3" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2"
+                                            Visibility="{x:Bind ViewModel.IsSourceFilterActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                    <TextBlock Text="Event Source" FontWeight="SemiBold" FontSize="13" />
+                                </StackPanel>
+                                <ComboBox ItemsSource="{x:Bind ViewModel.SourceCategories, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedSource, Mode=TwoWay}"
+                                          DisplayMemberPath="Display"
+                                          HorizontalAlignment="Stretch"
+                                          Visibility="{x:Bind ViewModel.SourceComboBoxVisibility, Mode=OneWay}" />
                                 <DropDownButton Content="{x:Bind ViewModel.SourceFilterSummary, Mode=OneWay}"
-                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                Visibility="{x:Bind ViewModel.SourceDropDownVisibility, Mode=OneWay}">
                                     <DropDownButton.Flyout>
                                         <Flyout Placement="Bottom">
                                             <ListView ItemsSource="{x:Bind ViewModel.SourceCategories, Mode=OneWay}"
                                                       SelectionMode="None" IsItemClickEnabled="False"
                                                       MinWidth="280" MaxHeight="400">
+                                                <ListView.ItemContainerStyle>
+                                                    <Style TargetType="ListViewItem">
+                                                        <Setter Property="Visibility" Value="{Binding ListRowVisibility}" />
+                                                    </Style>
+                                                </ListView.ItemContainerStyle>
                                                 <ListView.ItemTemplate>
                                                     <DataTemplate x:DataType="models:SourceCategory">
                                                         <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
@@ -108,7 +148,11 @@
                             </StackPanel>
 
                             <StackPanel Spacing="6">
-                                <TextBlock Text="Time Range" FontWeight="SemiBold" FontSize="13" />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Border Width="3" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2"
+                                            Visibility="{x:Bind ViewModel.IsTimeFilterActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                    <TextBlock Text="Time Range" FontWeight="SemiBold" FontSize="13" />
+                                </StackPanel>
                                 <ComboBox ItemsSource="{x:Bind ViewModel.LoadWindows, Mode=OneWay}"
                                           SelectedItem="{x:Bind ViewModel.SelectedLoadWindow, Mode=TwoWay}"
                                           DisplayMemberPath="Name"
@@ -137,14 +181,29 @@
                             </StackPanel>
 
                             <StackPanel Spacing="6">
-                                <TextBlock Text="Event Level" FontWeight="SemiBold" FontSize="13" />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Border Width="3" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2"
+                                            Visibility="{x:Bind ViewModel.IsLevelFilterActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                    <TextBlock Text="Event Level" FontWeight="SemiBold" FontSize="13" />
+                                </StackPanel>
+                                <ComboBox ItemsSource="{x:Bind ViewModel.AvailableTypes, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedType, Mode=TwoWay}"
+                                          DisplayMemberPath="Name"
+                                          HorizontalAlignment="Stretch"
+                                          Visibility="{x:Bind ViewModel.LevelComboBoxVisibility, Mode=OneWay}" />
                                 <DropDownButton Content="{x:Bind ViewModel.LevelFilterSummary, Mode=OneWay}"
-                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                Visibility="{x:Bind ViewModel.LevelDropDownVisibility, Mode=OneWay}">
                                     <DropDownButton.Flyout>
                                         <Flyout Placement="Bottom">
                                             <ListView ItemsSource="{x:Bind ViewModel.AvailableTypes, Mode=OneWay}"
                                                       SelectionMode="None" IsItemClickEnabled="False"
                                                       MinWidth="220" MaxHeight="400">
+                                                <ListView.ItemContainerStyle>
+                                                    <Style TargetType="ListViewItem">
+                                                        <Setter Property="Visibility" Value="{Binding ListRowVisibility}" />
+                                                    </Style>
+                                                </ListView.ItemContainerStyle>
                                                 <ListView.ItemTemplate>
                                                     <DataTemplate>
                                                         <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
@@ -159,20 +218,39 @@
                             </StackPanel>
 
                             <StackPanel Spacing="6">
-                                <TextBlock Text="Message" FontWeight="SemiBold" FontSize="13" />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Border Width="3" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2"
+                                            Visibility="{x:Bind ViewModel.IsMessageFilterActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                    <TextBlock Text="Message" FontWeight="SemiBold" FontSize="13" />
+                                </StackPanel>
                                 <TextBox PlaceholderText="Search messages..."
                                          Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
 
                             <StackPanel Spacing="6">
-                                <TextBlock Text="User" FontWeight="SemiBold" FontSize="13" />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Border Width="3" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2"
+                                            Visibility="{x:Bind ViewModel.IsUserFilterActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                    <TextBlock Text="User" FontWeight="SemiBold" FontSize="13" />
+                                </StackPanel>
+                                <ComboBox ItemsSource="{x:Bind ViewModel.UserCategories, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedUser, Mode=TwoWay}"
+                                          DisplayMemberPath="Display"
+                                          HorizontalAlignment="Stretch"
+                                          Visibility="{x:Bind ViewModel.UserComboBoxVisibility, Mode=OneWay}" />
                                 <DropDownButton Content="{x:Bind ViewModel.UserFilterSummary, Mode=OneWay}"
-                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                Visibility="{x:Bind ViewModel.UserDropDownVisibility, Mode=OneWay}">
                                     <DropDownButton.Flyout>
                                         <Flyout Placement="Bottom">
                                             <ListView ItemsSource="{x:Bind ViewModel.UserCategories, Mode=OneWay}"
                                                       SelectionMode="None" IsItemClickEnabled="False"
                                                       MinWidth="260" MaxHeight="400">
+                                                <ListView.ItemContainerStyle>
+                                                    <Style TargetType="ListViewItem">
+                                                        <Setter Property="Visibility" Value="{Binding ListRowVisibility}" />
+                                                    </Style>
+                                                </ListView.ItemContainerStyle>
                                                 <ListView.ItemTemplate>
                                                     <DataTemplate x:DataType="models:SourceCategory">
                                                         <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
@@ -187,14 +265,29 @@
                             </StackPanel>
 
                             <StackPanel Spacing="6">
-                                <TextBlock Text="Process" FontWeight="SemiBold" FontSize="13" />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Border Width="3" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2"
+                                            Visibility="{x:Bind ViewModel.IsProcessFilterActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                    <TextBlock Text="Process" FontWeight="SemiBold" FontSize="13" />
+                                </StackPanel>
+                                <ComboBox ItemsSource="{x:Bind ViewModel.ProcessCategories, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedProcess, Mode=TwoWay}"
+                                          DisplayMemberPath="Display"
+                                          HorizontalAlignment="Stretch"
+                                          Visibility="{x:Bind ViewModel.ProcessComboBoxVisibility, Mode=OneWay}" />
                                 <DropDownButton Content="{x:Bind ViewModel.ProcessFilterSummary, Mode=OneWay}"
-                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                Visibility="{x:Bind ViewModel.ProcessDropDownVisibility, Mode=OneWay}">
                                     <DropDownButton.Flyout>
                                         <Flyout Placement="Bottom">
                                             <ListView ItemsSource="{x:Bind ViewModel.ProcessCategories, Mode=OneWay}"
                                                       SelectionMode="None" IsItemClickEnabled="False"
                                                       MinWidth="220" MaxHeight="400">
+                                                <ListView.ItemContainerStyle>
+                                                    <Style TargetType="ListViewItem">
+                                                        <Setter Property="Visibility" Value="{Binding ListRowVisibility}" />
+                                                    </Style>
+                                                </ListView.ItemContainerStyle>
                                                 <ListView.ItemTemplate>
                                                     <DataTemplate x:DataType="models:SourceCategory">
                                                         <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
@@ -209,14 +302,29 @@
                             </StackPanel>
 
                             <StackPanel Spacing="6">
-                                <TextBlock Text="Computer" FontWeight="SemiBold" FontSize="13" />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Border Width="3" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2"
+                                            Visibility="{x:Bind ViewModel.IsComputerFilterActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                    <TextBlock Text="Computer" FontWeight="SemiBold" FontSize="13" />
+                                </StackPanel>
+                                <ComboBox ItemsSource="{x:Bind ViewModel.ComputerCategories, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedComputer, Mode=TwoWay}"
+                                          DisplayMemberPath="Display"
+                                          HorizontalAlignment="Stretch"
+                                          Visibility="{x:Bind ViewModel.ComputerComboBoxVisibility, Mode=OneWay}" />
                                 <DropDownButton Content="{x:Bind ViewModel.ComputerFilterSummary, Mode=OneWay}"
-                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                Visibility="{x:Bind ViewModel.ComputerDropDownVisibility, Mode=OneWay}">
                                     <DropDownButton.Flyout>
                                         <Flyout Placement="Bottom">
                                             <ListView ItemsSource="{x:Bind ViewModel.ComputerCategories, Mode=OneWay}"
                                                       SelectionMode="None" IsItemClickEnabled="False"
                                                       MinWidth="260" MaxHeight="400">
+                                                <ListView.ItemContainerStyle>
+                                                    <Style TargetType="ListViewItem">
+                                                        <Setter Property="Visibility" Value="{Binding ListRowVisibility}" />
+                                                    </Style>
+                                                </ListView.ItemContainerStyle>
                                                 <ListView.ItemTemplate>
                                                     <DataTemplate x:DataType="models:SourceCategory">
                                                         <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
@@ -231,14 +339,29 @@
                             </StackPanel>
 
                             <StackPanel Spacing="6">
-                                <TextBlock Text="Channel" FontWeight="SemiBold" FontSize="13" />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Border Width="3" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2"
+                                            Visibility="{x:Bind ViewModel.IsChannelFilterActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                    <TextBlock Text="Channel" FontWeight="SemiBold" FontSize="13" />
+                                </StackPanel>
+                                <ComboBox ItemsSource="{x:Bind ViewModel.ChannelCategories, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedChannel, Mode=TwoWay}"
+                                          DisplayMemberPath="Display"
+                                          HorizontalAlignment="Stretch"
+                                          Visibility="{x:Bind ViewModel.ChannelComboBoxVisibility, Mode=OneWay}" />
                                 <DropDownButton Content="{x:Bind ViewModel.ChannelFilterSummary, Mode=OneWay}"
-                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                Visibility="{x:Bind ViewModel.ChannelDropDownVisibility, Mode=OneWay}">
                                     <DropDownButton.Flyout>
                                         <Flyout Placement="Bottom">
                                             <ListView ItemsSource="{x:Bind ViewModel.ChannelCategories, Mode=OneWay}"
                                                       SelectionMode="None" IsItemClickEnabled="False"
                                                       MinWidth="260" MaxHeight="400">
+                                                <ListView.ItemContainerStyle>
+                                                    <Style TargetType="ListViewItem">
+                                                        <Setter Property="Visibility" Value="{Binding ListRowVisibility}" />
+                                                    </Style>
+                                                </ListView.ItemContainerStyle>
                                                 <ListView.ItemTemplate>
                                                     <DataTemplate x:DataType="models:SourceCategory">
                                                         <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
@@ -252,6 +375,28 @@
                                 </DropDownButton>
                             </StackPanel>
 
+                            <Grid ColumnSpacing="4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" Click="SaveFilters_Click"
+                                        HorizontalAlignment="Stretch"
+                                        ToolTipService.ToolTip="Save the current filters as a JSON file">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <FontIcon Glyph="&#xE74E;" FontSize="12" />
+                                        <TextBlock Text="Save filters" FontSize="12" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Grid.Column="1" Click="LoadFilters_Click"
+                                        HorizontalAlignment="Stretch"
+                                        ToolTipService.ToolTip="Load filters from a JSON file">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <FontIcon Glyph="&#xE8E5;" FontSize="12" />
+                                        <TextBlock Text="Load filters" FontSize="12" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
                             <Button Content="Clear All Filters" Click="ClearFilters_Click"
                                     HorizontalAlignment="Stretch" />
                         </StackPanel>

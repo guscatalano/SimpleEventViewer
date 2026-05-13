@@ -43,6 +43,7 @@ public sealed partial class SettingsPage : Page
         }
 
         RowColorModeComboBox.SelectedIndex = (int)SettingsService.Instance.RowColorMode;
+        TitleFormatComboBox.SelectedIndex = (int)SettingsService.Instance.TitleFormat;
 
         var savedLines = SettingsService.Instance.MaxRowLines;
         for (int i = 0; i < MaxRowLinesComboBox.Items.Count; i++)
@@ -78,6 +79,15 @@ public sealed partial class SettingsPage : Page
     private void ExperimentalFormatsSwitch_Toggled(object sender, RoutedEventArgs e)
     {
         SettingsService.Instance.ExperimentalFileFormats = ExperimentalFormatsSwitch.IsOn;
+    }
+
+    private void TitleFormatComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (TitleFormatComboBox.SelectedItem is ComboBoxItem item && item.Tag != null
+            && int.TryParse(item.Tag.ToString(), out var v))
+        {
+            SettingsService.Instance.TitleFormat = (TitleFormat)v;
+        }
     }
 
     private void BuildColumnVisibilityChecks()

@@ -87,6 +87,22 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
+                            <TextBlock Text="Title Bar Format" FontWeight="SemiBold" />
+                            <TextBlock Text="How the window title is composed (useful when multiple windows are open)" Opacity="0.7" FontSize="12" />
+                        </StackPanel>
+                        <ComboBox Grid.Column="1" x:Name="TitleFormatComboBox" SelectionChanged="TitleFormatComboBox_SelectionChanged" Width="220">
+                            <ComboBoxItem Content="source — Simple Event Viewer" Tag="0" />
+                            <ComboBoxItem Content="Simple Event Viewer" Tag="1" />
+                            <ComboBoxItem Content="Simple Event Viewer — source" Tag="2" />
+                        </ComboBox>
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
                             <TextBlock Text="Message Lines" FontWeight="SemiBold" />
                             <TextBlock Text="How many lines of the message to show per row" Opacity="0.7" FontSize="12" />
                         </StackPanel>

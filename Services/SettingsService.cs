@@ -23,6 +23,16 @@ public enum RowColorMode
     FullRow = 1
 }
 
+public enum TitleFormat
+{
+    /// <summary>"sample.evtx — Simple Event Viewer". The default.</summary>
+    SourceThenApp = 0,
+    /// <summary>"Simple Event Viewer".</summary>
+    JustApp = 1,
+    /// <summary>"Simple Event Viewer — sample.evtx".</summary>
+    AppThenSource = 2
+}
+
 public class SettingsService
 {
     private static readonly Lazy<SettingsService> _instance = new(() => new SettingsService());
@@ -39,6 +49,7 @@ public class SettingsService
     private const string McpServerPortKey = "McpServerPort";
     private const string ExperimentalFormatsKey = "ExperimentalFileFormats";
     private const string MultiSelectKeyPrefix = "FilterMultiSelect_";
+    private const string TitleFormatKey = "TitleFormat";
 
     public event Action? ThemeChanged;
 
@@ -274,6 +285,32 @@ public class SettingsService
         }
     }
 
+    public TitleFormat TitleFormat
+    {
+        get
+        {
+            try
+            {
+                if (ApplicationData.Current.LocalSettings.Values[TitleFormatKey] is int v
+                    && Enum.IsDefined(typeof(TitleFormat), v))
+                {
+                    return (TitleFormat)v;
+                }
+            }
+            catch { }
+            return TitleFormat.SourceThenApp;
+        }
+        set
+        {
+            try { ApplicationData.Current.LocalSettings.Values[TitleFormatKey] = (int)value; } catch { }
+            TitleFormatChanged?.Invoke();
+        }
+    }
+
+    /// <summary>Fired when the title-format setting changes so the active
+    /// window can repaint its caption.</summary>
+    public event Action? TitleFormatChanged;
+
     public bool ExperimentalFileFormats
     {
         get
@@ -375,6 +412,7 @@ public class SettingsService
             s.Remove(McpServerEnabledKey);
             s.Remove(McpServerPortKey);
             s.Remove(ExperimentalFormatsKey);
+            s.Remove(TitleFormatKey);
             foreach (FilterDimension d in Enum.GetValues(typeof(FilterDimension)))
             {
                 s.Remove(MultiSelectKeyPrefix + d);
@@ -389,6 +427,7 @@ public class SettingsService
         ThemeChanged?.Invoke();
         ExperimentalFormatsChanged?.Invoke();
         ColumnVisibilityChanged?.Invoke();
+        TitleFormatChanged?.Invoke();
 
         // Stop the MCP server if it was running — default is off.
         Mcp.EventLogMcpServer.Instance.Stop();
