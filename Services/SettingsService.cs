@@ -34,9 +34,11 @@ public class SettingsService
     private const string MaxRowLinesKey = "MaxRowLines";
     private const string RememberColumnWidthsKey = "RememberColumnWidths";
     private const string ColumnWidthsKey = "ColumnWidths";
+    private const string ColumnVisibilityKey = "ColumnVisibility";
     private const string McpServerEnabledKey = "McpServerEnabled";
     private const string McpServerPortKey = "McpServerPort";
     private const string ExperimentalFormatsKey = "ExperimentalFileFormats";
+    private const string MultiSelectKeyPrefix = "FilterMultiSelect_";
 
     public event Action? ThemeChanged;
 
@@ -102,6 +104,65 @@ public class SettingsService
         catch { }
     }
 
+    /// <summary>
+    /// Returns the persisted visible/hidden state of each column keyed by its
+    /// Tag, or null if the user has never toggled the Columns menu. Format
+    /// on disk is "tag=0|1;..." (1 = visible).
+    /// </summary>
+    public Dictionary<string, bool>? LoadColumnVisibility()
+    {
+        try
+        {
+            if (ApplicationData.Current.LocalSettings.Values[ColumnVisibilityKey] is string s)
+            {
+                var result = new Dictionary<string, bool>();
+                foreach (var part in s.Split(';', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var eq = part.IndexOf('=');
+                    if (eq <= 0) continue;
+                    var key = part.Substring(0, eq);
+                    var val = part.Substring(eq + 1);
+                    result[key] = val == "1" || val.Equals("true", StringComparison.OrdinalIgnoreCase);
+                }
+                return result;
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    public void SaveColumnVisibility(IReadOnlyDictionary<string, bool> visibility)
+    {
+        try
+        {
+            var s = string.Join(";", visibility.Select(kv => $"{kv.Key}={(kv.Value ? 1 : 0)}"));
+            ApplicationData.Current.LocalSettings.Values[ColumnVisibilityKey] = s;
+        }
+        catch { }
+        ColumnVisibilityChanged?.Invoke();
+    }
+
+    /// <summary>Fired after column-visibility settings change so the active
+    /// MainPage can refresh its DataGrid without a relaunch.</summary>
+    public event Action? ColumnVisibilityChanged;
+
+    /// <summary>
+    /// The full list of DataGrid column identifiers in display order, with a
+    /// human-readable label and the default visibility used the first time
+    /// a user launches the app. Kept here (rather than spread across XAML)
+    /// so Settings can render checkboxes for them without duplicating the list.
+    /// </summary>
+    public static readonly (string Tag, string Label, bool DefaultVisible)[] AvailableColumns =
+    {
+        ("Time",    "Time",    true),
+        ("Level",   "Level",   true),
+        ("Id",      "ID",      true),
+        ("Source",  "Source",  true),
+        ("Channel", "Channel", false),
+        ("User",    "User",    true),
+        ("Message", "Message", true),
+    };
+
     public int MaxRowLines
     {
         get
@@ -143,7 +204,7 @@ public class SettingsService
                 }
             }
             catch { }
-            return RowColorMode.Badge;
+            return RowColorMode.FullRow;
         }
         set
         {
@@ -235,6 +296,28 @@ public class SettingsService
     /// toolbar can show/hide the XML and ETL buttons.</summary>
     public event Action? ExperimentalFormatsChanged;
 
+    public enum FilterDimension { Source, Level, User, Process, Computer, Channel }
+
+    public bool IsMultiSelectEnabled(FilterDimension dim)
+    {
+        try
+        {
+            if (ApplicationData.Current.LocalSettings.Values[MultiSelectKeyPrefix + dim] is bool b) return b;
+        }
+        catch { }
+        return true; // multi-select on by default
+    }
+
+    public void SetMultiSelectEnabled(FilterDimension dim, bool value)
+    {
+        try { ApplicationData.Current.LocalSettings.Values[MultiSelectKeyPrefix + dim] = value; } catch { }
+        MultiSelectChanged?.Invoke(dim);
+    }
+
+    /// <summary>Fired when a per-filter multi-select toggle flips so the
+    /// MainPage can rebuild its ListView selection mode.</summary>
+    public event Action<FilterDimension>? MultiSelectChanged;
+
     public bool McpServerEnabled
     {
         get
@@ -268,6 +351,45 @@ public class SettingsService
             if (value <= 0 || value >= 65536) return;
             try { ApplicationData.Current.LocalSettings.Values[McpServerPortKey] = value; } catch { }
         }
+    }
+
+    /// <summary>
+    /// Reset every persisted preference to its first-launch default. Fires
+    /// the change events on each affected setting so currently-open pages
+    /// can rehydrate their controls without a restart.
+    /// </summary>
+    public void RestoreDefaults()
+    {
+        try
+        {
+            var s = ApplicationData.Current.LocalSettings.Values;
+            s.Remove(ThemeKey);
+            s.Remove(AccentColorKey);
+            s.Remove(RowColorModeKey);
+            s.Remove(MaxRowLinesKey);
+            s.Remove(RememberColumnWidthsKey);
+            s.Remove(ColumnWidthsKey);
+            s.Remove(ColumnVisibilityKey);
+            s.Remove(McpServerEnabledKey);
+            s.Remove(McpServerPortKey);
+            s.Remove(ExperimentalFormatsKey);
+            foreach (FilterDimension d in Enum.GetValues(typeof(FilterDimension)))
+            {
+                s.Remove(MultiSelectKeyPrefix + d);
+            }
+        }
+        catch { }
+
+        // Re-apply theme + accent so the UI immediately reflects defaults.
+        ApplyTheme(Theme);
+
+        // Notify listeners so any currently-rendered pages refresh.
+        ThemeChanged?.Invoke();
+        ExperimentalFormatsChanged?.Invoke();
+        ColumnVisibilityChanged?.Invoke();
+
+        // Stop the MCP server if it was running — default is off.
+        Mcp.EventLogMcpServer.Instance.Stop();
     }
 
     public void ApplyTheme(AppTheme theme)

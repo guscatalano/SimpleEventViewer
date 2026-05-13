@@ -32,4 +32,37 @@ public static class EventFilter
             (string.IsNullOrEmpty(searchTerms) || e.Message.Contains(searchTerms, StringComparison.OrdinalIgnoreCase))
         ).OrderByDescending(e => e.TimeCreated).ToList();
     }
+
+    /// <summary>
+    /// Multi-select-friendly overload. A null or empty set on a dimension means
+    /// "no filter on this dimension"; a non-empty set means the entry must
+    /// match one of the values in that set (OR within the dimension).
+    /// </summary>
+    public static List<EventLogEntry> Apply(
+        IEnumerable<EventLogEntry> events,
+        HashSet<string>? sources,
+        HashSet<LogLevel>? levels,
+        DateTime? startTime,
+        DateTime? endTime,
+        HashSet<string>? usernames,
+        string? searchTerms,
+        HashSet<string>? processIds,
+        HashSet<string>? computers,
+        HashSet<string>? channels)
+    {
+        bool HasAny(HashSet<string>? s) => s != null && s.Count > 0;
+        bool HasLevels(HashSet<LogLevel>? s) => s != null && s.Count > 0;
+
+        return events.Where(e =>
+            (!HasAny(sources)     || sources!.Contains(e.ProviderName)) &&
+            (!HasLevels(levels)   || levels!.Contains(e.Level)) &&
+            (!startTime.HasValue  || e.TimeCreated >= startTime.Value) &&
+            (!endTime.HasValue    || e.TimeCreated <= endTime.Value) &&
+            (!HasAny(usernames)   || usernames!.Contains(e.Username ?? string.Empty)) &&
+            (!HasAny(processIds)  || processIds!.Contains(e.ProcessId.ToString())) &&
+            (!HasAny(computers)   || computers!.Contains(e.Computer ?? string.Empty)) &&
+            (!HasAny(channels)    || channels!.Contains(e.Channel ?? string.Empty)) &&
+            (string.IsNullOrEmpty(searchTerms) || e.Message.Contains(searchTerms, StringComparison.OrdinalIgnoreCase))
+        ).OrderByDescending(e => e.TimeCreated).ToList();
+    }
 }

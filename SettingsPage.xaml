@@ -110,8 +110,15 @@
                             <TextBlock Text="Restore DataGrid column widths when relaunching the app" Opacity="0.7" FontSize="12" />
                         </StackPanel>
                         <ToggleSwitch Grid.Column="1" x:Name="RememberColumnWidthsSwitch"
+                                      MinWidth="200" HorizontalAlignment="Right"
                                       Toggled="RememberColumnWidthsSwitch_Toggled" />
                     </Grid>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Default columns shown" FontWeight="SemiBold" />
+                        <TextBlock Text="Pick which columns appear in the events grid. Changes apply immediately." Opacity="0.7" FontSize="12" />
+                        <StackPanel x:Name="ColumnVisibilityPanel" Spacing="4" Margin="0,4,0,0" />
+                    </StackPanel>
 
                     <!-- Preview swatches -->
                     <StackPanel Spacing="8" Margin="0,8,0,0">
@@ -151,6 +158,7 @@
                                        Text="Adds toolbar buttons for loading .xml and .etl files. These code paths are lightly tested and may render certain event formats with reduced detail." />
                         </StackPanel>
                         <ToggleSwitch Grid.Column="1" x:Name="ExperimentalFormatsSwitch"
+                                      MinWidth="200" HorizontalAlignment="Right"
                                       Toggled="ExperimentalFormatsSwitch_Toggled" />
                     </Grid>
                 </StackPanel>
@@ -175,6 +183,7 @@
                             <TextBlock x:Name="McpStatusText" Opacity="0.7" FontSize="12" />
                         </StackPanel>
                         <ToggleSwitch Grid.Column="1" x:Name="McpEnabledSwitch"
+                                      MinWidth="200" HorizontalAlignment="Right"
                                       Toggled="McpEnabledSwitch_Toggled" />
                     </Grid>
 
@@ -292,6 +301,29 @@
                         </StackPanel>
                     </StackPanel>
                 </StackPanel>
+            </Border>
+
+            <!-- Restore defaults -->
+            <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Restore defaults" FontWeight="SemiBold" />
+                        <TextBlock Text="Reset every preference on this page to the first-launch value. Does not delete loaded events." Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Click="RestoreDefaults_Click" Padding="10,6"
+                            VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE777;" FontSize="13" />
+                            <TextBlock Text="Restore defaults" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
             </Border>
 
             <!-- About Card -->

@@ -9,7 +9,8 @@
     xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     xmlns:tkcontrols="using:CommunityToolkit.WinUI.UI.Controls"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    mc:Ignorable="d">
+    mc:Ignorable="d"
+    NavigationCacheMode="Required">
 
     <Grid Padding="12" RowSpacing="8">
         <Grid.RowDefinitions>
@@ -198,7 +199,14 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-                        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Padding="8,4">
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Padding="8,4" Spacing="4">
+                            <Button Click="ExportButton_Click" Padding="6" Background="Transparent" BorderThickness="0"
+                                    ToolTipService.ToolTip="Export current view to CSV / JSON / XML">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <FontIcon Glyph="&#xEDE1;" FontSize="13" />
+                                    <TextBlock Text="Export" FontSize="12" />
+                                </StackPanel>
+                            </Button>
                             <Button Click="ColumnsButton_Click" Padding="6" Background="Transparent" BorderThickness="0"
                                     ToolTipService.ToolTip="Show/hide columns">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
@@ -224,7 +232,23 @@
                                           LoadingRow="EventsDataGrid_LoadingRow">
                         <tkcontrols:DataGrid.Columns>
                             <tkcontrols:DataGridTextColumn Header="Time" Tag="Time" Binding="{Binding TimeCreatedDisplay}" Width="160" />
-                            <tkcontrols:DataGridTextColumn Header="Level" Tag="Level" Binding="{Binding LevelName}" Width="100" />
+                            <tkcontrols:DataGridTemplateColumn Header="Level" Tag="Level" Width="100">
+                                <tkcontrols:DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{Binding Level, Converter={StaticResource LevelToBrushConverter}}"
+                                                CornerRadius="3"
+                                                HorizontalAlignment="Left"
+                                                VerticalAlignment="Center"
+                                                Padding="8,2"
+                                                Margin="6,0">
+                                            <TextBlock Text="{Binding LevelName}"
+                                                       Foreground="{Binding Level, Converter={StaticResource LevelToTextBrushConverter}}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold" />
+                                        </Border>
+                                    </DataTemplate>
+                                </tkcontrols:DataGridTemplateColumn.CellTemplate>
+                            </tkcontrols:DataGridTemplateColumn>
                             <tkcontrols:DataGridTextColumn Header="ID" Tag="Id" Binding="{Binding Id}" Width="60" />
                             <tkcontrols:DataGridTextColumn Header="Source" Tag="Source" Binding="{Binding ProviderName}" Width="180" />
                             <tkcontrols:DataGridTextColumn Header="Channel" Tag="Channel" Binding="{Binding Channel}" Width="150" Visibility="Collapsed" />
