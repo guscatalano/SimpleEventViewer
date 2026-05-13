@@ -28,6 +28,15 @@ public class SourceCategory : System.ComponentModel.INotifyPropertyChanged
     public bool IsAllSources { get; set; }
     public string Display => $"{Name} ({Count})";
 
+    /// <summary>
+    /// Collapsed for the synthetic "All X" entries so the multi-select
+    /// ListView doesn't render a meaningless checkbox row for them. The
+    /// ComboBox still shows them because that's where "no filter active"
+    /// is selectable.
+    /// </summary>
+    public Microsoft.UI.Xaml.Visibility ListRowVisibility =>
+        IsAllSources ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
+
     private bool _isSelected;
     public bool IsSelected
     {

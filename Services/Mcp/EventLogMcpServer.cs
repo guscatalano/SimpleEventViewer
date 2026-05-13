@@ -32,7 +32,7 @@ public sealed class EventLogMcpServer
 
     private const string ProtocolVersion = "2024-11-05";
     private const string ServerName = "SimpleEventViewer";
-    private const string ServerVersion = "1.0.0";
+    private const string ServerVersion = "1.1.0";
 
     public bool IsRunning => _listener?.IsListening == true;
     public int Port { get; private set; }

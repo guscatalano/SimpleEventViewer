@@ -18,6 +18,7 @@
             <local:LevelToBrushConverter x:Key="LevelToBrushConverter" />
             <local:LevelToTextBrushConverter x:Key="LevelToTextBrushConverter" />
             <local:LevelToRowBrushConverter x:Key="LevelToRowBrushConverter" />
+            <local:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
             <local:BadgeVisibilityConverter x:Key="BadgeVisibilityConverter" />
             <local:PlainLevelVisibilityConverter x:Key="PlainLevelVisibilityConverter" />
         </ResourceDictionary>

@@ -58,12 +58,26 @@ Whether you're investigating a crash, hunting down a flaky service, or pulling e
 
 Free, no telemetry, no ads.
 
+## What's new (1.1.0)
+
+- Multi-select on every filter except Time and Message — per-filter toggle in Settings (defaults: Source + Level multi, others single)
+- Cross-aware filter options: each dropdown narrows based on the other active filters, with live counts
+- Active-filter accent bar next to each filter label so it's obvious which filters are reducing the view
+- Save / Load filter presets to JSON
+- Export current view to CSV / JSON / XML, plus "Copy as XML" alongside CSV / JSON
+- Title bar reflects what's loaded (3 layouts in Settings → Title Bar Format)
+- Refresh now re-reads the *currently loaded* source instead of always switching back to live
+- Consolidated **Open** menu replaces the three "Load" buttons
+- Persisted column visibility (via toolbar Columns menu or Settings)
+- Restore Defaults button in Settings
+- Five new themes: Nord, Dracula, Solarized (dark), Sepia (light), High Contrast — each with its own surface palette
+
 ## What's new (1.0.0)
 First official release.
 
 - Live Windows event log reader with streaming load
 - Open `.evtx` files; experimental support for `.xml` and `.etl` behind a toggle
-- Eight built-in themes and a separate app-wide accent picker
+- Light / Dark / System themes and an app-wide accent picker
 - Column widths persist across launches
 - Optional local MCP server with VS Code / Cursor / Claude Desktop / Claude Code configs
 - About page shows the running version
