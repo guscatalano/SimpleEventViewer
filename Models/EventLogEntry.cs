@@ -29,13 +29,13 @@ public class SourceCategory : System.ComponentModel.INotifyPropertyChanged
     public string Display => $"{Name} ({Count})";
 
     /// <summary>
-    /// Collapsed for the synthetic "All X" entries so the multi-select
-    /// ListView doesn't render a meaningless checkbox row for them. The
-    /// ComboBox still shows them because that's where "no filter active"
-    /// is selectable.
+    /// True for real rows; false for the synthetic "All X" entry. The
+    /// multi-select ListView binds its container's Visibility to this via
+    /// a BoolToVisibility converter so the "All" row stays out of the
+    /// checkbox flyout. Kept as a bool (not a Visibility) so this model
+    /// remains free of Microsoft.UI.Xaml — the tests project compiles it.
     /// </summary>
-    public Microsoft.UI.Xaml.Visibility ListRowVisibility =>
-        IsAllSources ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
+    public bool IsListRow => !IsAllSources;
 
     private bool _isSelected;
     public bool IsSelected

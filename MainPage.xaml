@@ -131,7 +131,7 @@
                                                       MinWidth="280" MaxHeight="400">
                                                 <ListView.ItemContainerStyle>
                                                     <Style TargetType="ListViewItem">
-                                                        <Setter Property="Visibility" Value="{Binding ListRowVisibility}" />
+                                                        <Setter Property="Visibility" Value="{Binding IsListRow, Converter={StaticResource BoolToVisibilityConverter}}" />
                                                     </Style>
                                                 </ListView.ItemContainerStyle>
                                                 <ListView.ItemTemplate>
@@ -201,7 +201,7 @@
                                                       MinWidth="220" MaxHeight="400">
                                                 <ListView.ItemContainerStyle>
                                                     <Style TargetType="ListViewItem">
-                                                        <Setter Property="Visibility" Value="{Binding ListRowVisibility}" />
+                                                        <Setter Property="Visibility" Value="{Binding IsListRow, Converter={StaticResource BoolToVisibilityConverter}}" />
                                                     </Style>
                                                 </ListView.ItemContainerStyle>
                                                 <ListView.ItemTemplate>
@@ -248,7 +248,7 @@
                                                       MinWidth="260" MaxHeight="400">
                                                 <ListView.ItemContainerStyle>
                                                     <Style TargetType="ListViewItem">
-                                                        <Setter Property="Visibility" Value="{Binding ListRowVisibility}" />
+                                                        <Setter Property="Visibility" Value="{Binding IsListRow, Converter={StaticResource BoolToVisibilityConverter}}" />
                                                     </Style>
                                                 </ListView.ItemContainerStyle>
                                                 <ListView.ItemTemplate>
@@ -285,7 +285,7 @@
                                                       MinWidth="220" MaxHeight="400">
                                                 <ListView.ItemContainerStyle>
                                                     <Style TargetType="ListViewItem">
-                                                        <Setter Property="Visibility" Value="{Binding ListRowVisibility}" />
+                                                        <Setter Property="Visibility" Value="{Binding IsListRow, Converter={StaticResource BoolToVisibilityConverter}}" />
                                                     </Style>
                                                 </ListView.ItemContainerStyle>
                                                 <ListView.ItemTemplate>
@@ -322,7 +322,7 @@
                                                       MinWidth="260" MaxHeight="400">
                                                 <ListView.ItemContainerStyle>
                                                     <Style TargetType="ListViewItem">
-                                                        <Setter Property="Visibility" Value="{Binding ListRowVisibility}" />
+                                                        <Setter Property="Visibility" Value="{Binding IsListRow, Converter={StaticResource BoolToVisibilityConverter}}" />
                                                     </Style>
                                                 </ListView.ItemContainerStyle>
                                                 <ListView.ItemTemplate>
@@ -359,7 +359,7 @@
                                                       MinWidth="260" MaxHeight="400">
                                                 <ListView.ItemContainerStyle>
                                                     <Style TargetType="ListViewItem">
-                                                        <Setter Property="Visibility" Value="{Binding ListRowVisibility}" />
+                                                        <Setter Property="Visibility" Value="{Binding IsListRow, Converter={StaticResource BoolToVisibilityConverter}}" />
                                                     </Style>
                                                 </ListView.ItemContainerStyle>
                                                 <ListView.ItemTemplate>

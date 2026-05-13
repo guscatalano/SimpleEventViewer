@@ -120,12 +120,16 @@ public class UiSmokeTests : IDisposable
         var window = _app!.GetMainWindow(_automation, TimeSpan.FromSeconds(15));
         Assert.NotNull(window);
 
-        var expected = new[] { "Load Local Event Log", "Refresh", "Load EVTX", "Load XML", "Load ETL" };
-        foreach (var name in expected)
-        {
-            var btn = FindByName(window, name);
-            Assert.True(btn != null, $"Expected to find a button named '{name}'");
-        }
+        // The toolbar collapses source selection into a single "Open" dropdown
+        // (Live / EVTX / experimental XML+ETL) next to the contextual Refresh
+        // button. We only assert on the surface controls — the menu items are
+        // exercised by App_DataGridPopulatesAfterLoadingEvtxFile.
+        Assert.True(FindByName(window, "Open") != null, "Expected an 'Open' toolbar button");
+
+        var refresh = window.FindFirstDescendant(cf =>
+            cf.ByControlType(ControlType.Button)
+              .And(cf.ByName("Refresh live logs").Or(cf.ByName("Refresh"))));
+        Assert.True(refresh != null, "Expected a Refresh toolbar button (live or contextual label)");
     }
 
     [Fact]
@@ -211,16 +215,27 @@ public class UiSmokeTests : IDisposable
                 Console.WriteLine($"  hwnd={w.Hwnd:X} class={w.ClassName} title='{w.Title}'");
             }
 
-            // Click the Load EVTX button. AppBarButton may require Invoke pattern
-            // or a direct mouse click on its bounding rectangle.
-            var btn = FindByName(window, "Load EVTX");
-            Assert.True(btn != null, "Load EVTX button not found");
-            Console.WriteLine($"Load EVTX button: rect={btn!.BoundingRectangle}");
+            // The toolbar now has a single "Open" dropdown; click it to reveal
+            // the menu, then click the "EVTX file…" item.
+            var openBtn = FindByName(window, "Open");
+            Assert.True(openBtn != null, "Open toolbar button not found");
+            Console.WriteLine($"Open button: rect={openBtn!.BoundingRectangle}");
 
-            // Focus app window first, then click via mouse coordinates
             window.SetForeground();
             Thread.Sleep(500);
-            ClickElement(btn!);
+            ClickElement(openBtn!);
+            Thread.Sleep(500);
+
+            // Menu item — try a couple of plausible names since the en-dash and
+            // unicode ellipsis vary by Windows version.
+            AutomationElement? evtxItem = null;
+            foreach (var label in new[] { "EVTX file…", "EVTX file...", "EVTX file" })
+            {
+                evtxItem = FindByName(window, label);
+                if (evtxItem != null) break;
+            }
+            Assert.True(evtxItem != null, "EVTX file menu item not found inside Open dropdown");
+            ClickElement(evtxItem!);
 
             // Brief wait so the file dialog has time to open
             Thread.Sleep(500);
