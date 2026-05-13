@@ -305,7 +305,9 @@ public class SettingsService
             if (ApplicationData.Current.LocalSettings.Values[MultiSelectKeyPrefix + dim] is bool b) return b;
         }
         catch { }
-        return true; // multi-select on by default
+        // Defaults reflect typical usage: Source and Level are often used to
+        // OR a few values together; the rest are usually "narrow to one".
+        return dim == FilterDimension.Source || dim == FilterDimension.Level;
     }
 
     public void SetMultiSelectEnabled(FilterDimension dim, bool value)

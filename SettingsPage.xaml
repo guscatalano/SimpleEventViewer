@@ -141,6 +141,18 @@
                 </StackPanel>
             </Border>
 
+            <!-- Filter multi-select Card -->
+            <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="20">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Filter multi-select" FontSize="18" FontWeight="SemiBold" />
+                    <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+                               Text="When on, a filter dropdown lets you pick multiple values (matches any selected). When off, you can only pick one at a time. Defaults: Source and Level multi, the rest single — flip any of them either way." />
+                    <StackPanel x:Name="MultiSelectTogglesPanel" Spacing="4" />
+                </StackPanel>
+            </Border>
+
             <!-- Experimental Card -->
             <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"

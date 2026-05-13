@@ -3,9 +3,11 @@ using SimpleEventViewer.Models;
 using SimpleEventViewer.Services;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 
 namespace SimpleEventViewer.ViewModels;
 
@@ -54,14 +56,16 @@ public partial class MainViewModel : ObservableObject
 
         AvailableTypes = new List<EventTypeItem>
         {
-            new() { Level = null, Name = "All Levels" },
             new() { Level = LogLevel.Critical, Name = "Critical" },
             new() { Level = LogLevel.Error, Name = "Error" },
             new() { Level = LogLevel.Warning, Name = "Warning" },
             new() { Level = LogLevel.Information, Name = "Information" },
             new() { Level = LogLevel.Verbose, Name = "Verbose" }
         };
-        _selectedType = AvailableTypes[0]; // default to All Levels
+        foreach (var t in AvailableTypes) t.PropertyChanged += OnLevelItemChanged;
+        _selectedType = null!; // unused with multi-select; kept to satisfy non-nullable field
+
+        SettingsService.Instance.MultiSelectChanged += OnMultiSelectChanged;
 
         LoadWindows = new List<LoadWindowItem>
         {
@@ -467,25 +471,14 @@ public partial class MainViewModel : ObservableObject
         _isFileSource = false;
         CancelPrefetch();
         FilteredEvents.Clear();
-        SourceCategories.Clear();
-        SourceCategories.Add(new SourceCategory { Name = "All Sources", Count = 0, IsAllSources = true });
-        SelectedSource = SourceCategories[0];
 
-        ProcessCategories.Clear();
-        ProcessCategories.Add(new SourceCategory { Name = "All Processes", Count = 0, IsAllSources = true });
-        SelectedProcess = ProcessCategories[0];
-
-        UserCategories.Clear();
-        UserCategories.Add(new SourceCategory { Name = "All Users", Count = 0, IsAllSources = true });
-        SelectedUser = UserCategories[0];
-
-        ComputerCategories.Clear();
-        ComputerCategories.Add(new SourceCategory { Name = "All Computers", Count = 0, IsAllSources = true });
-        SelectedComputer = ComputerCategories[0];
-
-        ChannelCategories.Clear();
-        ChannelCategories.Add(new SourceCategory { Name = "All Channels", Count = 0, IsAllSources = true });
-        SelectedChannel = ChannelCategories[0];
+        // Empty selections = "show all". Each category list is repopulated
+        // from event data once UpdateSourceCategories runs after load.
+        ClearCategoryList(SourceCategories);
+        ClearCategoryList(ProcessCategories);
+        ClearCategoryList(UserCategories);
+        ClearCategoryList(ComputerCategories);
+        ClearCategoryList(ChannelCategories);
 
         CurrentSource = "Live system logs";
         _totalEventCount = -1;
@@ -567,38 +560,28 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Rebuild every filter dropdown so it shows only values that exist in the
-    /// event subset matched by the OTHER currently-active filters. The dropdown
-    /// for filter X is computed with X excluded from the criteria so the user
-    /// can still switch their selection within X. The selected value is kept
-    /// in the list (as a stale entry) when it no longer matches, so we don't
-    /// silently drop the user's choice.
+    /// Rebuild each filter dropdown so it shows values that exist in the
+    /// event subset matched by the OTHER active filters. The user's
+    /// selection is preserved by name across rebuilds (stale entries kept
+    /// with Count=0 when a previously-selected value is no longer in the
+    /// filtered subset).
     ///
-    /// Heavy lifting (5× full-table filter sweeps) runs on a background thread
-    /// since the master list can be 200k+ events on a "Last 30 days" lookback.
-    /// The UI thread only does the final ObservableCollection swap. Concurrent
-    /// invocations are cancelled so only the latest result is applied.
+    /// Heavy lifting (5 filter sweeps over up to ~200k events) runs on a
+    /// background <see cref="Task.Run"/>; only the final list swap touches
+    /// the UI thread. Concurrent invocations cancel the in-flight one.
     /// </summary>
-    private void UpdateSourceCategories()
+    private void UpdateSourceCategories(SettingsService.FilterDimension? skipDim = null)
     {
-        // Snapshot the criteria on the UI thread. The events list itself is
-        // already a copy (EventLogService.Events.ToList()).
         var master = EventLogService.Instance.Events;
         var startTime = GetEffectiveStartTime();
         var endTime = GetEffectiveEndTime();
-        var sourceName = SelectedSource is { IsAllSources: false } ? SelectedSource.Name : null;
-        var processId  = SelectedProcess is { IsAllSources: false } ? SelectedProcess.Name : null;
-        var userName   = SelectedUser is { IsAllSources: false } ? SelectedUser.Name : null;
-        var computer   = SelectedComputer is { IsAllSources: false } ? SelectedComputer.Name : null;
-        var channel    = SelectedChannel is { IsAllSources: false } ? SelectedChannel.Name : null;
-        var level      = SelectedType?.Level;
-        var search     = SearchText;
-
-        var currentSourceName   = SelectedSource?.Name;
-        var currentProcessName  = SelectedProcess?.Name;
-        var currentUserName     = SelectedUser?.Name;
-        var currentComputerName = SelectedComputer?.Name;
-        var currentChannelName  = SelectedChannel?.Name;
+        var sources   = SelectedSourceNames();
+        var processes = SelectedProcessNames();
+        var users     = SelectedUserNames();
+        var computers = SelectedComputerNames();
+        var channels  = SelectedChannelNames();
+        var levels    = SelectedLevelSet();
+        var search    = SearchText;
 
         _filterOptionsCts?.Cancel();
         _filterOptionsCts = new System.Threading.CancellationTokenSource();
@@ -608,17 +591,33 @@ public partial class MainViewModel : ObservableObject
         {
             try
             {
-                // Each dimension is computed with its own filter nulled out.
-                var sourceOptions   = BuildOptions(master, "All Sources",   EventFilter.Apply(master, null,       level, startTime, endTime, userName, search, processId, computer, channel), e => string.IsNullOrEmpty(e.ProviderName) ? null : e.ProviderName, numericSort: false, token);
-                if (token.IsCancellationRequested) return;
-                var processOptions  = BuildOptions(master, "All Processes", EventFilter.Apply(master, sourceName, level, startTime, endTime, userName, search, null,       computer, channel), e => e.ProcessId > 0 ? e.ProcessId.ToString() : null, numericSort: true, token);
-                if (token.IsCancellationRequested) return;
-                var userOptions     = BuildOptions(master, "All Users",     EventFilter.Apply(master, sourceName, level, startTime, endTime, null,     search, processId, computer, channel), e => string.IsNullOrEmpty(e.Username) ? null : e.Username, numericSort: false, token);
-                if (token.IsCancellationRequested) return;
-                var computerOptions = BuildOptions(master, "All Computers", EventFilter.Apply(master, sourceName, level, startTime, endTime, userName, search, processId, null,     channel), e => string.IsNullOrEmpty(e.Computer) ? null : e.Computer, numericSort: false, token);
-                if (token.IsCancellationRequested) return;
-                var channelOptions  = BuildOptions(master, "All Channels",  EventFilter.Apply(master, sourceName, level, startTime, endTime, userName, search, processId, computer, null   ), e => string.IsNullOrEmpty(e.Channel) ? null : e.Channel, numericSort: false, token);
-                if (token.IsCancellationRequested) return;
+                List<SourceCategory>? sourceOpts = null, processOpts = null, userOpts = null, compOpts = null, chanOpts = null;
+
+                if (skipDim != SettingsService.FilterDimension.Source)
+                {
+                    sourceOpts = AggregateOptions(EventFilter.Apply(master, null, levels, startTime, endTime, users, search, processes, computers, channels), e => string.IsNullOrEmpty(e.ProviderName) ? null : e.ProviderName, numericSort: false, token);
+                    if (token.IsCancellationRequested) return;
+                }
+                if (skipDim != SettingsService.FilterDimension.Process)
+                {
+                    processOpts = AggregateOptions(EventFilter.Apply(master, sources, levels, startTime, endTime, users, search, null, computers, channels), e => e.ProcessId > 0 ? e.ProcessId.ToString() : null, numericSort: true, token);
+                    if (token.IsCancellationRequested) return;
+                }
+                if (skipDim != SettingsService.FilterDimension.User)
+                {
+                    userOpts = AggregateOptions(EventFilter.Apply(master, sources, levels, startTime, endTime, null, search, processes, computers, channels), e => string.IsNullOrEmpty(e.Username) ? null : e.Username, numericSort: false, token);
+                    if (token.IsCancellationRequested) return;
+                }
+                if (skipDim != SettingsService.FilterDimension.Computer)
+                {
+                    compOpts = AggregateOptions(EventFilter.Apply(master, sources, levels, startTime, endTime, users, search, processes, null, channels), e => string.IsNullOrEmpty(e.Computer) ? null : e.Computer, numericSort: false, token);
+                    if (token.IsCancellationRequested) return;
+                }
+                if (skipDim != SettingsService.FilterDimension.Channel)
+                {
+                    chanOpts = AggregateOptions(EventFilter.Apply(master, sources, levels, startTime, endTime, users, search, processes, computers, null), e => string.IsNullOrEmpty(e.Channel) ? null : e.Channel, numericSort: false, token);
+                    if (token.IsCancellationRequested) return;
+                }
 
                 _dispatcherQueue.TryEnqueue(() =>
                 {
@@ -626,11 +625,11 @@ public partial class MainViewModel : ObservableObject
                     _suppressApplyFilters = true;
                     try
                     {
-                        ApplyOptions(SourceCategories,   sourceOptions,   currentSourceName,   v => SelectedSource   = v);
-                        ApplyOptions(ProcessCategories,  processOptions,  currentProcessName,  v => SelectedProcess  = v);
-                        ApplyOptions(UserCategories,     userOptions,     currentUserName,     v => SelectedUser     = v);
-                        ApplyOptions(ComputerCategories, computerOptions, currentComputerName, v => SelectedComputer = v);
-                        ApplyOptions(ChannelCategories,  channelOptions,  currentChannelName,  v => SelectedChannel  = v);
+                        if (sourceOpts  != null) ApplyOptions(SourceCategories,   sourceOpts,  sources);
+                        if (processOpts != null) ApplyOptions(ProcessCategories,  processOpts, processes);
+                        if (userOpts    != null) ApplyOptions(UserCategories,     userOpts,    users);
+                        if (compOpts    != null) ApplyOptions(ComputerCategories, compOpts,    computers);
+                        if (chanOpts    != null) ApplyOptions(ChannelCategories,  chanOpts,    channels);
                     }
                     finally
                     {
@@ -643,12 +642,11 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Pure-CPU work: aggregate counts and produce a fresh List of
-    /// SourceCategory entries. Runs on a background thread.
+    /// Background work: count occurrences in <paramref name="filtered"/> per
+    /// distinct key and return a sorted list of new SourceCategory instances
+    /// (IsSelected starts false; the UI thread applies preservation).
     /// </summary>
-    private static List<SourceCategory> BuildOptions(
-        IReadOnlyList<EventLogEntry> master,
-        string allLabel,
+    private static List<SourceCategory> AggregateOptions(
         List<EventLogEntry> filtered,
         Func<EventLogEntry, string?> keySelector,
         bool numericSort,
@@ -667,45 +665,268 @@ public partial class MainViewModel : ObservableObject
             ? counts.OrderBy(kv => int.TryParse(kv.Key, out var n) ? n : int.MaxValue)
             : counts.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase);
 
-        var list = new List<SourceCategory>(counts.Count + 1)
-        {
-            new SourceCategory { Name = allLabel, Count = filtered.Count, IsAllSources = true }
-        };
+        var list = new List<SourceCategory>(counts.Count);
         foreach (var kv in ordered)
         {
-            list.Add(new SourceCategory { Name = kv.Key, Count = kv.Value, IsAllSources = false });
+            list.Add(new SourceCategory { Name = kv.Key, Count = kv.Value });
         }
         return list;
     }
 
     /// <summary>
-    /// UI-thread swap: clear the bound collection and re-add the new items in
-    /// a single pass, then re-select the user's previous choice (kept as a
-    /// stale zero-count entry if it's no longer in the filtered set).
+    /// UI-thread step: replace the items in the bound collection, restoring
+    /// IsSelected for any entry whose Name is in <paramref name="preserved"/>.
+    /// Selections that no longer correspond to any entry in the filtered set
+    /// are re-added at the end as zero-count "stale" entries — so the user's
+    /// pick survives a tight filter without silently disappearing.
     /// </summary>
-    private static void ApplyOptions(
+    private void ApplyOptions(
         ObservableCollection<SourceCategory> bound,
         List<SourceCategory> next,
-        string? currentName,
-        Action<SourceCategory?> setSelected)
+        HashSet<string> preserved)
     {
+        foreach (var old in bound) old.PropertyChanged -= OnCategoryItemChanged;
         bound.Clear();
-        foreach (var item in next) bound.Add(item);
 
-        if (!string.IsNullOrEmpty(currentName))
+        foreach (var item in next)
         {
-            var match = bound.FirstOrDefault(c => c.Name == currentName);
-            if (match == null && bound.Count > 0 && bound[0].Name != currentName)
+            item.IsSelected = preserved.Contains(item.Name);
+            item.PropertyChanged += OnCategoryItemChanged;
+            bound.Add(item);
+        }
+
+        // Preserve selections that are no longer in the filtered subset.
+        foreach (var name in preserved)
+        {
+            if (!bound.Any(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase)))
             {
-                match = new SourceCategory { Name = currentName, Count = 0, IsAllSources = false };
-                bound.Add(match);
+                var stale = new SourceCategory { Name = name, Count = 0, IsSelected = true };
+                stale.PropertyChanged += OnCategoryItemChanged;
+                bound.Add(stale);
             }
-            setSelected(match ?? (bound.Count > 0 ? bound[0] : null));
         }
-        else if (bound.Count > 0)
+    }
+
+    // --- multi-select selection helpers ------------------------------------
+
+    private static HashSet<string> SelectionFrom(IEnumerable<SourceCategory> items)
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var c in items)
         {
-            setSelected(bound[0]);
+            if (c.IsSelected && !c.IsAllSources) set.Add(c.Name);
         }
+        return set;
+    }
+
+    private HashSet<string> SelectedSourceNames()   => SelectionFrom(SourceCategories);
+    private HashSet<string> SelectedProcessNames()  => SelectionFrom(ProcessCategories);
+    private HashSet<string> SelectedUserNames()     => SelectionFrom(UserCategories);
+    private HashSet<string> SelectedComputerNames() => SelectionFrom(ComputerCategories);
+    private HashSet<string> SelectedChannelNames()  => SelectionFrom(ChannelCategories);
+
+    private HashSet<LogLevel> SelectedLevelSet()
+    {
+        var set = new HashSet<LogLevel>();
+        foreach (var t in AvailableTypes)
+        {
+            if (t.IsSelected && t.Level.HasValue) set.Add(t.Level.Value);
+        }
+        return set;
+    }
+
+    /// <summary>Clear every item in a category list (unsubscribe + Clear).</summary>
+    private void ClearCategoryList(ObservableCollection<SourceCategory> list)
+    {
+        foreach (var c in list) c.PropertyChanged -= OnCategoryItemChanged;
+        list.Clear();
+    }
+
+    private void OnCategoryItemChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(SourceCategory.IsSelected) || _suppressApplyFilters) return;
+
+        SettingsService.FilterDimension? dim = null;
+        if (sender is SourceCategory cat)
+        {
+            var located = LocateDimension(cat);
+            if (located.Item1 != null) dim = located.Item2;
+            if (cat.IsSelected) EnforceSingleSelectInCategory(cat);
+        }
+        ApplyFilters(dim);
+    }
+
+    private void OnLevelItemChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(EventTypeItem.IsSelected) || _suppressApplyFilters) return;
+
+        if (sender is EventTypeItem level && level.IsSelected
+            && !SettingsService.Instance.IsMultiSelectEnabled(SettingsService.FilterDimension.Level))
+        {
+            _suppressApplyFilters = true;
+            try
+            {
+                foreach (var t in AvailableTypes)
+                {
+                    if (!ReferenceEquals(t, level) && t.IsSelected) t.IsSelected = false;
+                }
+            }
+            finally { _suppressApplyFilters = false; }
+        }
+        ApplyFilters(SettingsService.FilterDimension.Level);
+    }
+
+    /// <summary>
+    /// If the dimension this category lives in is in single-select mode and
+    /// the user just checked one entry, deselect every other entry in the
+    /// same list so the visual + filter state match.
+    /// </summary>
+    private void EnforceSingleSelectInCategory(SourceCategory justSelected)
+    {
+        var (collection, dim) = LocateDimension(justSelected);
+        if (collection == null) return;
+        if (SettingsService.Instance.IsMultiSelectEnabled(dim)) return;
+
+        _suppressApplyFilters = true;
+        try
+        {
+            foreach (var c in collection)
+            {
+                if (!ReferenceEquals(c, justSelected) && c.IsSelected) c.IsSelected = false;
+            }
+        }
+        finally { _suppressApplyFilters = false; }
+    }
+
+    private (ObservableCollection<SourceCategory>?, SettingsService.FilterDimension) LocateDimension(SourceCategory cat)
+    {
+        if (SourceCategories.Contains(cat))   return (SourceCategories,   SettingsService.FilterDimension.Source);
+        if (ProcessCategories.Contains(cat))  return (ProcessCategories,  SettingsService.FilterDimension.Process);
+        if (UserCategories.Contains(cat))     return (UserCategories,     SettingsService.FilterDimension.User);
+        if (ComputerCategories.Contains(cat)) return (ComputerCategories, SettingsService.FilterDimension.Computer);
+        if (ChannelCategories.Contains(cat))  return (ChannelCategories,  SettingsService.FilterDimension.Channel);
+        return (null, default);
+    }
+
+    private void OnMultiSelectChanged(SettingsService.FilterDimension dim)
+    {
+        _dispatcherQueue.TryEnqueue(() =>
+        {
+            // If the user just turned MULTI off for a dimension that currently
+            // has more than one selection, collapse to the first one so the
+            // filter result matches what the user can see.
+            if (!SettingsService.Instance.IsMultiSelectEnabled(dim))
+            {
+                CollapseToFirstSelection(dim);
+            }
+
+            OnPropertyChanged(dim switch
+            {
+                SettingsService.FilterDimension.Source   => nameof(SourceSelectionMode),
+                SettingsService.FilterDimension.Process  => nameof(ProcessSelectionMode),
+                SettingsService.FilterDimension.User     => nameof(UserSelectionMode),
+                SettingsService.FilterDimension.Computer => nameof(ComputerSelectionMode),
+                SettingsService.FilterDimension.Channel  => nameof(ChannelSelectionMode),
+                SettingsService.FilterDimension.Level    => nameof(LevelSelectionMode),
+                _ => string.Empty
+            });
+        });
+    }
+
+    private void CollapseToFirstSelection(SettingsService.FilterDimension dim)
+    {
+        if (dim == SettingsService.FilterDimension.Level)
+        {
+            var first = AvailableTypes.FirstOrDefault(t => t.IsSelected);
+            if (first == null) return;
+            _suppressApplyFilters = true;
+            try
+            {
+                foreach (var t in AvailableTypes)
+                {
+                    if (!ReferenceEquals(t, first) && t.IsSelected) t.IsSelected = false;
+                }
+            }
+            finally { _suppressApplyFilters = false; }
+            ApplyFilters();
+            return;
+        }
+
+        var list = dim switch
+        {
+            SettingsService.FilterDimension.Source   => SourceCategories,
+            SettingsService.FilterDimension.Process  => ProcessCategories,
+            SettingsService.FilterDimension.User     => UserCategories,
+            SettingsService.FilterDimension.Computer => ComputerCategories,
+            SettingsService.FilterDimension.Channel  => ChannelCategories,
+            _ => null
+        };
+        if (list == null) return;
+        var firstCat = list.FirstOrDefault(c => c.IsSelected);
+        if (firstCat == null) return;
+        _suppressApplyFilters = true;
+        try
+        {
+            foreach (var c in list)
+            {
+                if (!ReferenceEquals(c, firstCat) && c.IsSelected) c.IsSelected = false;
+            }
+        }
+        finally { _suppressApplyFilters = false; }
+        ApplyFilters();
+    }
+
+    // --- filter button labels + ListView selection modes -------------------
+
+    public string SourceFilterSummary   => Summarize(SourceCategories,   "All Sources");
+    public string ProcessFilterSummary  => Summarize(ProcessCategories,  "All Processes");
+    public string UserFilterSummary     => Summarize(UserCategories,     "All Users");
+    public string ComputerFilterSummary => Summarize(ComputerCategories, "All Computers");
+    public string ChannelFilterSummary  => Summarize(ChannelCategories,  "All Channels");
+    public string LevelFilterSummary
+    {
+        get
+        {
+            var sel = AvailableTypes.Where(t => t.IsSelected && t.Level.HasValue).ToList();
+            if (sel.Count == 0) return "All Levels";
+            if (sel.Count == 1) return sel[0].Name;
+            return $"{sel[0].Name} +{sel.Count - 1}";
+        }
+    }
+
+    private static string Summarize(IEnumerable<SourceCategory> items, string allLabel)
+    {
+        var selected = items.Where(c => c.IsSelected && !c.IsAllSources).ToList();
+        if (selected.Count == 0) return allLabel;
+        if (selected.Count == 1) return selected[0].Name;
+        return $"{selected[0].Name} +{selected.Count - 1}";
+    }
+
+    public ListViewSelectionMode SourceSelectionMode   => Mode(SettingsService.FilterDimension.Source);
+    public ListViewSelectionMode ProcessSelectionMode  => Mode(SettingsService.FilterDimension.Process);
+    public ListViewSelectionMode UserSelectionMode     => Mode(SettingsService.FilterDimension.User);
+    public ListViewSelectionMode ComputerSelectionMode => Mode(SettingsService.FilterDimension.Computer);
+    public ListViewSelectionMode ChannelSelectionMode  => Mode(SettingsService.FilterDimension.Channel);
+    public ListViewSelectionMode LevelSelectionMode    => Mode(SettingsService.FilterDimension.Level);
+
+    private static ListViewSelectionMode Mode(SettingsService.FilterDimension dim) =>
+        SettingsService.Instance.IsMultiSelectEnabled(dim) ? ListViewSelectionMode.Multiple : ListViewSelectionMode.Single;
+
+    /// <summary>Reset every multi-select dimension's selection state.</summary>
+    public void ClearAllSelections()
+    {
+        _suppressApplyFilters = true;
+        try
+        {
+            foreach (var c in SourceCategories)   c.IsSelected = false;
+            foreach (var c in ProcessCategories)  c.IsSelected = false;
+            foreach (var c in UserCategories)     c.IsSelected = false;
+            foreach (var c in ComputerCategories) c.IsSelected = false;
+            foreach (var c in ChannelCategories)  c.IsSelected = false;
+            foreach (var t in AvailableTypes)     t.IsSelected = false;
+        }
+        finally { _suppressApplyFilters = false; }
+        ApplyFilters();
     }
 
     private DateTime GetEffectiveStartTime()
@@ -748,50 +969,51 @@ public partial class MainViewModel : ObservableObject
     {
         var startTime = GetEffectiveStartTime();
         var endTime = GetEffectiveEndTime();
-        var sourceName = SelectedSource == null || SelectedSource.IsAllSources ? null : SelectedSource.Name;
-        var processId = SelectedProcess == null || SelectedProcess.IsAllSources ? null : SelectedProcess.Name;
-        var userName = SelectedUser == null || SelectedUser.IsAllSources ? null : SelectedUser.Name;
-        var computer = SelectedComputer == null || SelectedComputer.IsAllSources ? null : SelectedComputer.Name;
-        var channel = SelectedChannel == null || SelectedChannel.IsAllSources ? null : SelectedChannel.Name;
+        var sources   = SelectedSourceNames();
+        var processes = SelectedProcessNames();
+        var users     = SelectedUserNames();
+        var computers = SelectedComputerNames();
+        var channels  = SelectedChannelNames();
+        var levels    = SelectedLevelSet();
 
-        return (string.IsNullOrEmpty(sourceName) || entry.ProviderName == sourceName) &&
-               (SelectedType?.Level == null || entry.Level == SelectedType.Level.Value) &&
+        return (sources.Count == 0    || sources.Contains(entry.ProviderName)) &&
+               (levels.Count == 0     || levels.Contains(entry.Level)) &&
                (entry.TimeCreated >= startTime) &&
                (entry.TimeCreated <= endTime) &&
-               (string.IsNullOrEmpty(processId) || entry.ProcessId.ToString() == processId) &&
-               (string.IsNullOrEmpty(userName) || entry.Username == userName) &&
-               (string.IsNullOrEmpty(computer) || entry.Computer == computer) &&
-               (string.IsNullOrEmpty(channel) || entry.Channel == channel) &&
+               (processes.Count == 0  || processes.Contains(entry.ProcessId.ToString())) &&
+               (users.Count == 0      || users.Contains(entry.Username ?? string.Empty)) &&
+               (computers.Count == 0  || computers.Contains(entry.Computer ?? string.Empty)) &&
+               (channels.Count == 0   || channels.Contains(entry.Channel ?? string.Empty)) &&
                (string.IsNullOrEmpty(SearchText) || entry.Message.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
     }
 
+    public void ApplyFilters() => ApplyFilters(null);
 
-    public void ApplyFilters()
+    /// <summary>
+    /// <paramref name="changedDim"/> is the dimension whose selection just
+    /// flipped. That dimension's *own* dropdown list doesn't need to rebuild
+    /// (its options are derived from the OTHER filters, none of which moved)
+    /// — keeping its ListView stable avoids the flicker that made it look
+    /// like a backend reload.
+    /// </summary>
+    public void ApplyFilters(SettingsService.FilterDimension? changedDim)
     {
         if (_suppressApplyFilters) return;
 
         var startTime = GetEffectiveStartTime();
         var endTime = GetEffectiveEndTime();
-        var sourceName = SelectedSource == null || SelectedSource.IsAllSources ? null : SelectedSource.Name;
-        var processId = SelectedProcess == null || SelectedProcess.IsAllSources ? null : SelectedProcess.Name;
-        var userName = SelectedUser == null || SelectedUser.IsAllSources ? null : SelectedUser.Name;
-        var computer = SelectedComputer == null || SelectedComputer.IsAllSources ? null : SelectedComputer.Name;
-        var channel = SelectedChannel == null || SelectedChannel.IsAllSources ? null : SelectedChannel.Name;
+        var sources   = SelectedSourceNames();
+        var processes = SelectedProcessNames();
+        var users     = SelectedUserNames();
+        var computers = SelectedComputerNames();
+        var channels  = SelectedChannelNames();
+        var levels    = SelectedLevelSet();
 
-        var filtered = EventLogService.Instance.FilterEvents(
-            sourceName,
-            SelectedType?.Level,
-            startTime,
-            endTime,
-            userName,
-            SearchText,
-            processId,
-            computer,
-            channel
-        );
+        var filtered = EventFilter.Apply(
+            EventLogService.Instance.Events,
+            sources, levels, startTime, endTime, users,
+            SearchText, processes, computers, channels);
 
-        // For large result sets, replacing the collection is far cheaper than
-        // N individual Add calls (each of which triggers a DataGrid layout pass).
         if (filtered.Count > 500)
         {
             FilteredEvents = new ObservableCollection<EventLogEntry>(filtered);
@@ -799,16 +1021,18 @@ public partial class MainViewModel : ObservableObject
         else
         {
             FilteredEvents.Clear();
-            foreach (var entry in filtered)
-            {
-                FilteredEvents.Add(entry);
-            }
+            foreach (var entry in filtered) FilteredEvents.Add(entry);
         }
 
-        // Keep dropdown contents in sync with the active filter set so e.g.
-        // picking "Last 24 hours" prunes the Source/User/Process/etc. lists
-        // to values that actually appear in that window.
-        UpdateSourceCategories();
+        // Summaries change whenever any selection changes.
+        OnPropertyChanged(nameof(SourceFilterSummary));
+        OnPropertyChanged(nameof(ProcessFilterSummary));
+        OnPropertyChanged(nameof(UserFilterSummary));
+        OnPropertyChanged(nameof(ComputerFilterSummary));
+        OnPropertyChanged(nameof(ChannelFilterSummary));
+        OnPropertyChanged(nameof(LevelFilterSummary));
+
+        UpdateSourceCategories(changedDim);
     }
 
     public void RefreshCurrentView()
