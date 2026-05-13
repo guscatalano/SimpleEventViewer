@@ -340,15 +340,7 @@ public sealed partial class MainPage : Page
 
     private void ClearFilters_Click(object sender, RoutedEventArgs e)
     {
-        ViewModel.SelectedSource = ViewModel.SourceCategories.Count > 0 ? ViewModel.SourceCategories[0] : null;
-        ViewModel.SelectedProcess = ViewModel.ProcessCategories.Count > 0 ? ViewModel.ProcessCategories[0] : null;
-        ViewModel.SelectedUser = ViewModel.UserCategories.Count > 0 ? ViewModel.UserCategories[0] : null;
-        ViewModel.SelectedComputer = ViewModel.ComputerCategories.Count > 0 ? ViewModel.ComputerCategories[0] : null;
-        ViewModel.SelectedChannel = ViewModel.ChannelCategories.Count > 0 ? ViewModel.ChannelCategories[0] : null;
-        if (ViewModel.AvailableTypes.Count > 0)
-        {
-            ViewModel.SelectedType = ViewModel.AvailableTypes[0];
-        }
+        ViewModel.ClearAllSelections();
         ViewModel.StartTime = null;
         ViewModel.EndTime = null;
         ViewModel.StartTimeOfDay = TimeSpan.Zero;

@@ -43,11 +43,22 @@ public sealed partial class SettingsPage : Page
         }
 
         RowColorModeComboBox.SelectedIndex = (int)SettingsService.Instance.RowColorMode;
-        MaxRowLinesComboBox.SelectedIndex = SettingsService.Instance.MaxRowLines == 2 ? 1 : 0;
+
+        var savedLines = SettingsService.Instance.MaxRowLines;
+        for (int i = 0; i < MaxRowLinesComboBox.Items.Count; i++)
+        {
+            if (MaxRowLinesComboBox.Items[i] is ComboBoxItem item && item.Tag != null
+                && int.TryParse(item.Tag.ToString(), out var lines) && lines == savedLines)
+            {
+                MaxRowLinesComboBox.SelectedIndex = i;
+                break;
+            }
+        }
         RememberColumnWidthsSwitch.IsOn = SettingsService.Instance.RememberColumnWidths;
         ExperimentalFormatsSwitch.IsOn = SettingsService.Instance.ExperimentalFileFormats;
 
         BuildColumnVisibilityChecks();
+        BuildMultiSelectToggles();
 
         // MCP server
         _initializingMcp = true;
@@ -95,6 +106,54 @@ public sealed partial class SettingsPage : Page
             }
         }
         SettingsService.Instance.SaveColumnVisibility(visibility);
+    }
+
+    private void BuildMultiSelectToggles()
+    {
+        MultiSelectTogglesPanel.Children.Clear();
+        foreach (SettingsService.FilterDimension dim in
+                 System.Enum.GetValues(typeof(SettingsService.FilterDimension)))
+        {
+            var label = dim switch
+            {
+                SettingsService.FilterDimension.Source   => "Event Source",
+                SettingsService.FilterDimension.Level    => "Event Level",
+                SettingsService.FilterDimension.User     => "User",
+                SettingsService.FilterDimension.Process  => "Process",
+                SettingsService.FilterDimension.Computer => "Computer",
+                SettingsService.FilterDimension.Channel  => "Channel",
+                _ => dim.ToString()
+            };
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var text = new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(text, 0);
+            grid.Children.Add(text);
+
+            var toggle = new ToggleSwitch
+            {
+                IsOn = SettingsService.Instance.IsMultiSelectEnabled(dim),
+                Tag = dim,
+                MinWidth = 200,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+            toggle.Toggled += MultiSelectToggle_Toggled;
+            Grid.SetColumn(toggle, 1);
+            grid.Children.Add(toggle);
+
+            MultiSelectTogglesPanel.Children.Add(grid);
+        }
+    }
+
+    private void MultiSelectToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (sender is ToggleSwitch ts && ts.Tag is SettingsService.FilterDimension dim)
+        {
+            SettingsService.Instance.SetMultiSelectEnabled(dim, ts.IsOn);
+        }
     }
 
     // Guard the NumberBox + ToggleSwitch event handlers from firing while we
