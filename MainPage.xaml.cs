@@ -10,7 +10,6 @@ using SimpleEventViewer.ViewModels;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Text.Json;
 using Windows.ApplicationModel.DataTransfer;
 using WinRT.Interop;
 
@@ -31,6 +30,7 @@ public sealed partial class MainPage : Page
         // Refresh row colors when theme/color scheme changes
         SettingsService.Instance.ThemeChanged += OnThemeChanged;
         SettingsService.Instance.ExperimentalFormatsChanged += OnExperimentalFormatsChanged;
+        SettingsService.Instance.ColumnVisibilityChanged += OnColumnVisibilityChanged;
 
         // If a file was passed on the command line, load it after the page is ready.
         Loaded += MainPage_Loaded;
@@ -39,6 +39,11 @@ public sealed partial class MainPage : Page
     private void OnExperimentalFormatsChanged()
     {
         DispatcherQueue.TryEnqueue(UpdateExperimentalButtons);
+    }
+
+    private void OnColumnVisibilityChanged()
+    {
+        DispatcherQueue.TryEnqueue(RestoreColumnVisibility);
     }
 
     private void UpdateExperimentalButtons()
@@ -53,6 +58,7 @@ public sealed partial class MainPage : Page
         Loaded -= MainPage_Loaded;
 
         RestoreColumnWidths();
+        RestoreColumnVisibility();
         UpdateExperimentalButtons();
 
         var startupFile = (Application.Current as App)?.StartupFilePath;
@@ -94,6 +100,27 @@ public sealed partial class MainPage : Page
     }
 
     /// <summary>
+    /// Restore which columns the user had visible last session. Independent
+    /// of RememberColumnWidths so a user who wants the layout to stay
+    /// dynamic still gets persistent show/hide.
+    /// </summary>
+    private void RestoreColumnVisibility()
+    {
+        var visibility = SettingsService.Instance.LoadColumnVisibility();
+        if (visibility == null) return;
+
+        foreach (var col in EventsDataGrid.Columns)
+        {
+            var tag = col.Tag?.ToString();
+            if (string.IsNullOrEmpty(tag)) continue;
+            if (visibility.TryGetValue(tag, out var visible))
+            {
+                col.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+    }
+
+    /// <summary>
     /// Save current column widths to settings. Called from the Window.Closed
     /// hook in MainWindow so widths survive across launches.
     /// </summary>
@@ -112,6 +139,21 @@ public sealed partial class MainPage : Page
         if (widths.Count > 0)
         {
             SettingsService.Instance.SaveColumnWidths(widths);
+        }
+    }
+
+    public void SaveColumnVisibility()
+    {
+        var visibility = new Dictionary<string, bool>();
+        foreach (var col in EventsDataGrid.Columns)
+        {
+            var tag = col.Tag?.ToString();
+            if (string.IsNullOrEmpty(tag)) continue;
+            visibility[tag] = col.Visibility == Visibility.Visible;
+        }
+        if (visibility.Count > 0)
+        {
+            SettingsService.Instance.SaveColumnVisibility(visibility);
         }
     }
 
@@ -144,6 +186,10 @@ public sealed partial class MainPage : Page
         var jsonItem = new MenuFlyoutItem { Text = "JSON" };
         jsonItem.Click += CopyRowsAsJson_Click;
         copyAsItem.Items.Add(jsonItem);
+
+        var xmlItem = new MenuFlyoutItem { Text = "XML" };
+        xmlItem.Click += CopyRowsAsXml_Click;
+        copyAsItem.Items.Add(xmlItem);
 
         menu.Items.Add(copyAsItem);
 
@@ -180,25 +226,14 @@ public sealed partial class MainPage : Page
     {
         var entries = GetSelectedEntries().ToList();
         if (entries.Count == 0) return;
+        SetClipboard(EventExporter.Serialize(entries, EventExporter.Format.Json));
+    }
 
-        var simplified = entries.Select(en => new
-        {
-            en.TimeCreated,
-            Level = en.LevelName,
-            en.Id,
-            Source = en.ProviderName,
-            en.TaskName,
-            en.Keywords,
-            User = en.Username,
-            en.ProcessId,
-            en.ThreadId,
-            en.Computer,
-            en.Message,
-            en.Xml
-        });
-
-        var json = JsonSerializer.Serialize(simplified, new JsonSerializerOptions { WriteIndented = true });
-        SetClipboard(json);
+    private void CopyRowsAsXml_Click(object sender, RoutedEventArgs e)
+    {
+        var entries = GetSelectedEntries().ToList();
+        if (entries.Count == 0) return;
+        SetClipboard(EventExporter.Serialize(entries, EventExporter.Format.Xml));
     }
 
     private void OnThemeChanged()
@@ -439,19 +474,7 @@ public sealed partial class MainPage : Page
     {
         var entries = GetSelectedEntries().ToList();
         if (entries.Count == 0) return;
-
-        var sb = new StringBuilder();
-        sb.AppendLine("Time,Level,ID,Source,User,Message");
-        foreach (var entry in entries)
-        {
-            sb.Append(CsvEscape(entry.TimeCreatedDisplay)).Append(',');
-            sb.Append(CsvEscape(entry.LevelName)).Append(',');
-            sb.Append(entry.Id).Append(',');
-            sb.Append(CsvEscape(entry.ProviderName)).Append(',');
-            sb.Append(CsvEscape(entry.Username)).Append(',');
-            sb.AppendLine(CsvEscape(entry.Message));
-        }
-        SetClipboard(sb.ToString());
+        SetClipboard(EventExporter.Serialize(entries, EventExporter.Format.Csv));
     }
 
     private void CopyMessage_Click(object sender, RoutedEventArgs e)
@@ -461,16 +484,6 @@ public sealed partial class MainPage : Page
         var text = string.Join(Environment.NewLine + Environment.NewLine,
             entries.Select(en => en.Message));
         SetClipboard(text);
-    }
-
-    private static string CsvEscape(string? value)
-    {
-        if (string.IsNullOrEmpty(value)) return "";
-        if (value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r'))
-        {
-            return "\"" + value.Replace("\"", "\"\"") + "\"";
-        }
-        return value;
     }
 
     private static void SetClipboard(string text)
@@ -495,6 +508,82 @@ public sealed partial class MainPage : Page
         SetClipboard($"{entry.ProcessId} / {entry.ThreadId}");
     }
 
+    private void ExportButton_Click(object sender, RoutedEventArgs e)
+    {
+        var flyout = new MenuFlyout();
+        foreach (var fmt in new[] { EventExporter.Format.Csv, EventExporter.Format.Json, EventExporter.Format.Xml })
+        {
+            var item = new MenuFlyoutItem { Text = EventExporter.FormatLabel(fmt) };
+            var capturedFmt = fmt;
+            item.Click += (_, _) => ExportToFile(capturedFmt);
+            flyout.Items.Add(item);
+        }
+        if (sender is FrameworkElement fe) flyout.ShowAt(fe);
+    }
+
+    private async void ExportToFile(EventExporter.Format format)
+    {
+        var entries = ViewModel.FilteredEvents.ToList();
+        if (entries.Count == 0)
+        {
+            ViewModel.StatusMessage = "Nothing to export — no events in the current view";
+            return;
+        }
+
+        try
+        {
+            var window = (Application.Current as App)?.MainWindow;
+            var hwnd = window != null ? WindowNative.GetWindowHandle(window) : IntPtr.Zero;
+
+            var ext = EventExporter.DefaultExtension(format);
+            var label = EventExporter.FormatLabel(format);
+            var defaultName = $"events-{DateTime.Now:yyyyMMdd-HHmmss}{ext}";
+
+            var path = Win32FilePicker.SaveFile(
+                hwnd,
+                $"Export {entries.Count} events as {label}",
+                defaultName,
+                new[] { ($"{label} file", ext) });
+
+            if (string.IsNullOrEmpty(path)) return;
+
+            var contents = EventExporter.Serialize(entries, format);
+            System.IO.File.WriteAllText(path, contents);
+            ViewModel.StatusMessage = $"Exported {entries.Count} events to {System.IO.Path.GetFileName(path)}";
+
+            var ask = new ContentDialog
+            {
+                Title = "Export complete",
+                Content = $"Exported {entries.Count} events to:\n{path}\n\nOpen the containing folder?",
+                PrimaryButtonText = "Open folder",
+                CloseButtonText = "Close",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = this.XamlRoot
+            };
+            if (await ask.ShowAsync() == ContentDialogResult.Primary)
+            {
+                try
+                {
+                    // /select highlights the file in Explorer instead of just opening the parent dir.
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "explorer.exe",
+                        Arguments = $"/select,\"{path}\"",
+                        UseShellExecute = false
+                    });
+                }
+                catch (Exception ex)
+                {
+                    ViewModel.StatusMessage = $"Couldn't open Explorer: {ex.Message}";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage = $"Export failed: {ex.Message}";
+        }
+    }
+
     private void ColumnsButton_Click(object sender, RoutedEventArgs e)
     {
         var flyout = new MenuFlyout();
@@ -509,6 +598,7 @@ public sealed partial class MainPage : Page
             item.Click += (s, args) =>
             {
                 capturedCol.Visibility = ((ToggleMenuFlyoutItem)s).IsChecked ? Visibility.Visible : Visibility.Collapsed;
+                SaveColumnVisibility();
             };
             flyout.Items.Add(item);
         }

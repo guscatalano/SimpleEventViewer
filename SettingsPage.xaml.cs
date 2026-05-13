@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using SimpleEventViewer.Services;
 using SimpleEventViewer.Services.Mcp;
+using System.Collections.Generic;
 using Windows.UI;
 
 namespace SimpleEventViewer;
@@ -46,6 +47,8 @@ public sealed partial class SettingsPage : Page
         RememberColumnWidthsSwitch.IsOn = SettingsService.Instance.RememberColumnWidths;
         ExperimentalFormatsSwitch.IsOn = SettingsService.Instance.ExperimentalFileFormats;
 
+        BuildColumnVisibilityChecks();
+
         // MCP server
         _initializingMcp = true;
         McpEnabledSwitch.IsOn = SettingsService.Instance.McpServerEnabled;
@@ -64,6 +67,34 @@ public sealed partial class SettingsPage : Page
     private void ExperimentalFormatsSwitch_Toggled(object sender, RoutedEventArgs e)
     {
         SettingsService.Instance.ExperimentalFileFormats = ExperimentalFormatsSwitch.IsOn;
+    }
+
+    private void BuildColumnVisibilityChecks()
+    {
+        ColumnVisibilityPanel.Children.Clear();
+        var saved = SettingsService.Instance.LoadColumnVisibility();
+
+        foreach (var (tag, label, defaultVisible) in SettingsService.AvailableColumns)
+        {
+            var isOn = saved != null && saved.TryGetValue(tag, out var v) ? v : defaultVisible;
+            var check = new CheckBox { Content = label, Tag = tag, IsChecked = isOn };
+            check.Checked += ColumnCheck_Changed;
+            check.Unchecked += ColumnCheck_Changed;
+            ColumnVisibilityPanel.Children.Add(check);
+        }
+    }
+
+    private void ColumnCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        var visibility = new Dictionary<string, bool>();
+        foreach (var child in ColumnVisibilityPanel.Children)
+        {
+            if (child is CheckBox cb && cb.Tag is string tag)
+            {
+                visibility[tag] = cb.IsChecked == true;
+            }
+        }
+        SettingsService.Instance.SaveColumnVisibility(visibility);
     }
 
     // Guard the NumberBox + ToggleSwitch event handlers from firing while we
@@ -233,6 +264,30 @@ public sealed partial class SettingsPage : Page
         ErrorSwatch.Background = new SolidColorBrush(error);
         WarningSwatch.Background = new SolidColorBrush(warning);
         InfoSwatch.Background = new SolidColorBrush(info);
+    }
+
+    private async void RestoreDefaults_Click(object sender, RoutedEventArgs e)
+    {
+        var confirm = new ContentDialog
+        {
+            Title = "Restore default settings?",
+            Content = "All preferences on this page will revert to their first-launch values. Loaded events and the current filter selection are untouched.",
+            PrimaryButtonText = "Restore",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = this.XamlRoot
+        };
+
+        var result = await confirm.ShowAsync();
+        if (result != ContentDialogResult.Primary) return;
+
+        await RunWithBusyOverlayAsync("Restoring defaults…", () =>
+        {
+            SettingsService.Instance.RestoreDefaults();
+        });
+
+        // Re-hydrate every control on this page so it reflects the defaults.
+        SettingsPage_Loaded(this, new RoutedEventArgs());
     }
 
     private void BackButton_Click(object sender, RoutedEventArgs e)

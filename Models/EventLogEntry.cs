@@ -21,10 +21,26 @@ public class EventLogEntry
     public bool IsSystemLog { get; set; } = true;
 }
 
-public class SourceCategory
+public class SourceCategory : System.ComponentModel.INotifyPropertyChanged
 {
     public string Name { get; set; } = string.Empty;
     public int Count { get; set; }
     public bool IsAllSources { get; set; }
     public string Display => $"{Name} ({Count})";
+
+    private bool _isSelected;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected != value)
+            {
+                _isSelected = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsSelected)));
+            }
+        }
+    }
+
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 }

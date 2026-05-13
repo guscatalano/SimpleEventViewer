@@ -46,6 +46,7 @@ public partial class MainViewModel : ObservableObject
     private System.Threading.CancellationTokenSource? _prefetchCts;
     private bool _isPrefetching = false;
     private bool _suppressApplyFilters = false;
+    private System.Threading.CancellationTokenSource? _filterOptionsCts;
 
     public MainViewModel()
     {
@@ -565,66 +566,145 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Rebuild every filter dropdown so it shows only values that exist in the
+    /// event subset matched by the OTHER currently-active filters. The dropdown
+    /// for filter X is computed with X excluded from the criteria so the user
+    /// can still switch their selection within X. The selected value is kept
+    /// in the list (as a stale entry) when it no longer matches, so we don't
+    /// silently drop the user's choice.
+    ///
+    /// Heavy lifting (5× full-table filter sweeps) runs on a background thread
+    /// since the master list can be 200k+ events on a "Last 30 days" lookback.
+    /// The UI thread only does the final ObservableCollection swap. Concurrent
+    /// invocations are cancelled so only the latest result is applied.
+    /// </summary>
     private void UpdateSourceCategories()
     {
-        var totalCount = EventLogService.Instance.Events.Count;
+        // Snapshot the criteria on the UI thread. The events list itself is
+        // already a copy (EventLogService.Events.ToList()).
+        var master = EventLogService.Instance.Events;
+        var startTime = GetEffectiveStartTime();
+        var endTime = GetEffectiveEndTime();
+        var sourceName = SelectedSource is { IsAllSources: false } ? SelectedSource.Name : null;
+        var processId  = SelectedProcess is { IsAllSources: false } ? SelectedProcess.Name : null;
+        var userName   = SelectedUser is { IsAllSources: false } ? SelectedUser.Name : null;
+        var computer   = SelectedComputer is { IsAllSources: false } ? SelectedComputer.Name : null;
+        var channel    = SelectedChannel is { IsAllSources: false } ? SelectedChannel.Name : null;
+        var level      = SelectedType?.Level;
+        var search     = SearchText;
 
-        RefreshCategoryList(SourceCategories, "All Sources", totalCount,
-            EventLogService.Instance.GetAvailableSources(),
-            EventLogService.Instance.SourceCounts,
-            SelectedSource?.Name,
-            v => SelectedSource = v);
+        var currentSourceName   = SelectedSource?.Name;
+        var currentProcessName  = SelectedProcess?.Name;
+        var currentUserName     = SelectedUser?.Name;
+        var currentComputerName = SelectedComputer?.Name;
+        var currentChannelName  = SelectedChannel?.Name;
 
-        RefreshCategoryList(ProcessCategories, "All Processes", totalCount,
-            EventLogService.Instance.GetAvailableProcesses(),
-            EventLogService.Instance.ProcessCounts,
-            SelectedProcess?.Name,
-            v => SelectedProcess = v);
+        _filterOptionsCts?.Cancel();
+        _filterOptionsCts = new System.Threading.CancellationTokenSource();
+        var token = _filterOptionsCts.Token;
 
-        RefreshCategoryList(UserCategories, "All Users", totalCount,
-            EventLogService.Instance.GetAvailableUsers(),
-            EventLogService.Instance.UserCounts,
-            SelectedUser?.Name,
-            v => SelectedUser = v);
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                // Each dimension is computed with its own filter nulled out.
+                var sourceOptions   = BuildOptions(master, "All Sources",   EventFilter.Apply(master, null,       level, startTime, endTime, userName, search, processId, computer, channel), e => string.IsNullOrEmpty(e.ProviderName) ? null : e.ProviderName, numericSort: false, token);
+                if (token.IsCancellationRequested) return;
+                var processOptions  = BuildOptions(master, "All Processes", EventFilter.Apply(master, sourceName, level, startTime, endTime, userName, search, null,       computer, channel), e => e.ProcessId > 0 ? e.ProcessId.ToString() : null, numericSort: true, token);
+                if (token.IsCancellationRequested) return;
+                var userOptions     = BuildOptions(master, "All Users",     EventFilter.Apply(master, sourceName, level, startTime, endTime, null,     search, processId, computer, channel), e => string.IsNullOrEmpty(e.Username) ? null : e.Username, numericSort: false, token);
+                if (token.IsCancellationRequested) return;
+                var computerOptions = BuildOptions(master, "All Computers", EventFilter.Apply(master, sourceName, level, startTime, endTime, userName, search, processId, null,     channel), e => string.IsNullOrEmpty(e.Computer) ? null : e.Computer, numericSort: false, token);
+                if (token.IsCancellationRequested) return;
+                var channelOptions  = BuildOptions(master, "All Channels",  EventFilter.Apply(master, sourceName, level, startTime, endTime, userName, search, processId, computer, null   ), e => string.IsNullOrEmpty(e.Channel) ? null : e.Channel, numericSort: false, token);
+                if (token.IsCancellationRequested) return;
 
-        RefreshCategoryList(ComputerCategories, "All Computers", totalCount,
-            EventLogService.Instance.GetAvailableComputers(),
-            EventLogService.Instance.ComputerCounts,
-            SelectedComputer?.Name,
-            v => SelectedComputer = v);
-
-        RefreshCategoryList(ChannelCategories, "All Channels", totalCount,
-            EventLogService.Instance.GetAvailableChannels(),
-            EventLogService.Instance.ChannelCounts,
-            SelectedChannel?.Name,
-            v => SelectedChannel = v);
+                _dispatcherQueue.TryEnqueue(() =>
+                {
+                    if (token.IsCancellationRequested) return;
+                    _suppressApplyFilters = true;
+                    try
+                    {
+                        ApplyOptions(SourceCategories,   sourceOptions,   currentSourceName,   v => SelectedSource   = v);
+                        ApplyOptions(ProcessCategories,  processOptions,  currentProcessName,  v => SelectedProcess  = v);
+                        ApplyOptions(UserCategories,     userOptions,     currentUserName,     v => SelectedUser     = v);
+                        ApplyOptions(ComputerCategories, computerOptions, currentComputerName, v => SelectedComputer = v);
+                        ApplyOptions(ChannelCategories,  channelOptions,  currentChannelName,  v => SelectedChannel  = v);
+                    }
+                    finally
+                    {
+                        _suppressApplyFilters = false;
+                    }
+                });
+            }
+            catch { }
+        }, token);
     }
 
-    private static void RefreshCategoryList(
-        ObservableCollection<SourceCategory> list,
+    /// <summary>
+    /// Pure-CPU work: aggregate counts and produce a fresh List of
+    /// SourceCategory entries. Runs on a background thread.
+    /// </summary>
+    private static List<SourceCategory> BuildOptions(
+        IReadOnlyList<EventLogEntry> master,
         string allLabel,
-        int totalCount,
-        List<string> values,
-        IReadOnlyDictionary<string, int> counts,
+        List<EventLogEntry> filtered,
+        Func<EventLogEntry, string?> keySelector,
+        bool numericSort,
+        System.Threading.CancellationToken token)
+    {
+        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < filtered.Count; i++)
+        {
+            if ((i & 4095) == 0 && token.IsCancellationRequested) return new List<SourceCategory>();
+            var key = keySelector(filtered[i]);
+            if (key == null) continue;
+            counts[key] = counts.TryGetValue(key, out var c) ? c + 1 : 1;
+        }
+
+        IEnumerable<KeyValuePair<string, int>> ordered = numericSort
+            ? counts.OrderBy(kv => int.TryParse(kv.Key, out var n) ? n : int.MaxValue)
+            : counts.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase);
+
+        var list = new List<SourceCategory>(counts.Count + 1)
+        {
+            new SourceCategory { Name = allLabel, Count = filtered.Count, IsAllSources = true }
+        };
+        foreach (var kv in ordered)
+        {
+            list.Add(new SourceCategory { Name = kv.Key, Count = kv.Value, IsAllSources = false });
+        }
+        return list;
+    }
+
+    /// <summary>
+    /// UI-thread swap: clear the bound collection and re-add the new items in
+    /// a single pass, then re-select the user's previous choice (kept as a
+    /// stale zero-count entry if it's no longer in the filtered set).
+    /// </summary>
+    private static void ApplyOptions(
+        ObservableCollection<SourceCategory> bound,
+        List<SourceCategory> next,
         string? currentName,
         Action<SourceCategory?> setSelected)
     {
-        list.Clear();
-        list.Add(new SourceCategory { Name = allLabel, Count = totalCount, IsAllSources = true });
-        foreach (var v in values)
-        {
-            counts.TryGetValue(v, out var c);
-            list.Add(new SourceCategory { Name = v, Count = c, IsAllSources = false });
-        }
+        bound.Clear();
+        foreach (var item in next) bound.Add(item);
 
         if (!string.IsNullOrEmpty(currentName))
         {
-            var match = list.FirstOrDefault(c => c.Name == currentName);
-            setSelected(match ?? list[0]);
+            var match = bound.FirstOrDefault(c => c.Name == currentName);
+            if (match == null && bound.Count > 0 && bound[0].Name != currentName)
+            {
+                match = new SourceCategory { Name = currentName, Count = 0, IsAllSources = false };
+                bound.Add(match);
+            }
+            setSelected(match ?? (bound.Count > 0 ? bound[0] : null));
         }
-        else
+        else if (bound.Count > 0)
         {
-            setSelected(list[0]);
+            setSelected(bound[0]);
         }
     }
 
@@ -724,6 +804,11 @@ public partial class MainViewModel : ObservableObject
                 FilteredEvents.Add(entry);
             }
         }
+
+        // Keep dropdown contents in sync with the active filter set so e.g.
+        // picking "Last 24 hours" prunes the Source/User/Process/etc. lists
+        // to values that actually appear in that window.
+        UpdateSourceCategories();
     }
 
     public void RefreshCurrentView()
@@ -816,10 +901,26 @@ public partial class MainViewModel : ObservableObject
     }
 }
 
-public class EventTypeItem
+public class EventTypeItem : System.ComponentModel.INotifyPropertyChanged
 {
     public LogLevel? Level { get; set; }
     public string Name { get; set; } = string.Empty;
+
+    private bool _isSelected;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected != value)
+            {
+                _isSelected = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsSelected)));
+            }
+        }
+    }
+
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 }
 
 public class LoadWindowItem
