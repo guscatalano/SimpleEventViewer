@@ -1383,9 +1383,10 @@ public class EventTypeItem : System.ComponentModel.INotifyPropertyChanged
     public LogLevel? Level { get; set; }
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>Collapsed for the synthetic "All Levels" entry in the multi-select ListView.</summary>
-    public Microsoft.UI.Xaml.Visibility ListRowVisibility =>
-        Level == null ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
+    /// <summary>True for real levels (Critical / Error / ...); false for "All Levels".
+    /// The multi-select ListView binds its container Visibility via a
+    /// BoolToVisibility converter.</summary>
+    public bool IsListRow => Level != null;
 
     private bool _isSelected;
     public bool IsSelected
