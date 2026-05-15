@@ -200,4 +200,4 @@ Trimming and ReadyToRun are explicitly disabled during the MSIX build (`PublishT
 
 ## License & credits
 
-Created by Gus Catalano (gus@guscatalano.com).
+Created by Gus Catalano — [github.com/guscatalano](https://github.com/guscatalano).

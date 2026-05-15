@@ -97,7 +97,7 @@ event log, event viewer, evtx, windows logs, log viewer, eventlog, system logs, 
 © 2026 Gus Catalano
 
 ## Contact info
-gus@guscatalano.com
+https://github.com/guscatalano
 
 ## Privacy policy URL
 *(required by Store — point to a hosted privacy page; the app collects no telemetry)*
