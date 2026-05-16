@@ -18,11 +18,8 @@ public partial class MainViewModel : ObservableObject
     private DispatcherQueueTimer? _flushTimer;
 
     private string _statusMessage = "Ready";
-    private SourceCategory? _selectedSource;
-    private SourceCategory? _selectedProcess;
-    private SourceCategory? _selectedUser;
-    private SourceCategory? _selectedComputer;
-    private SourceCategory? _selectedChannel;
+    // Note: Selected* values are computed from each category collection's
+    // IsSelected items; no backing field needed (see CurrentSingleSelection).
     private EventTypeItem _selectedType = null!;
     private DateTimeOffset? _startTime;
     private DateTimeOffset? _endTime;
@@ -1459,11 +1456,8 @@ public partial class MainViewModel : ObservableObject
         var allTime = LoadWindows.FirstOrDefault(w => w.Lookback == null && !w.IsCustom);
         if (allTime != null) _selectedLoadWindow = allTime;
         _selectedType = AvailableTypes[0];
-        _selectedSource = null;
-        _selectedProcess = null;
-        _selectedUser = null;
-        _selectedComputer = null;
-        _selectedChannel = null;
+        // Filter selections live on each item's IsSelected; ClearCategoryList
+        // calls during the load already cleared them. Nothing to reset here.
         _startTime = null;
         _endTime = null;
         _startTimeOfDay = TimeSpan.Zero;

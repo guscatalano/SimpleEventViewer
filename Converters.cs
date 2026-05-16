@@ -63,7 +63,7 @@ public class DateOffsetConverter : IValueConverter
         {
             return (DateTimeOffset?)dto;
         }
-        return null;
+        return null!;
     }
 }
 

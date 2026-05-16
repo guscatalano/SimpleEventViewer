@@ -814,7 +814,7 @@ public sealed partial class MainPage : Page
             {
                 DispatcherQueue.TryEnqueue(() =>
                 {
-                    var b = _rowBrushConverter.Convert(capturedEntry.Level, typeof(Brush), null, "") as Brush;
+                    var b = _rowBrushConverter.Convert(capturedEntry.Level, typeof(Brush), null!, "") as Brush;
                     row.Background = b ?? _transparentBrush;
                 });
             }
@@ -823,7 +823,7 @@ public sealed partial class MainPage : Page
         _rowSubscriptions[row] = (entry, handler);
 
         // Initial paint.
-        var brush = _rowBrushConverter.Convert(entry.Level, typeof(Brush), null, "") as Brush;
+        var brush = _rowBrushConverter.Convert(entry.Level, typeof(Brush), null!, "") as Brush;
         e.Row.Background = brush ?? _transparentBrush;
     }
 

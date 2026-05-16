@@ -434,14 +434,14 @@ public class EventLogService
             var levelNode = node.SelectSingleNode("System/Level");
             var level = levelNode != null && int.TryParse(levelNode.InnerText, out var levelVal) ? (LogLevel)levelVal : LogLevel.Information;
             var timeNode = node.SelectSingleNode("System/TimeCreated");
-            var time = timeNode?.Attributes["SystemTime"]?.Value;
+            var time = timeNode?.Attributes?["SystemTime"]?.Value;
             var providerNode = node.SelectSingleNode("System/Provider");
-            var provider = providerNode?.Attributes["Name"]?.Value ?? "Unknown";
-            var providerGuid = providerNode?.Attributes["Guid"]?.Value ?? string.Empty;
+            var provider = providerNode?.Attributes?["Name"]?.Value ?? "Unknown";
+            var providerGuid = providerNode?.Attributes?["Guid"]?.Value ?? string.Empty;
             var channel = node.SelectSingleNode("System/Channel")?.InnerText ?? string.Empty;
             var task = node.SelectSingleNode("System/Task")?.InnerText ?? string.Empty;
             var keywords = node.SelectSingleNode("System/Keywords")?.InnerText ?? string.Empty;
-            var userNode = node.SelectSingleNode("System/Security")?.Attributes["UserID"]?.Value;
+            var userNode = node.SelectSingleNode("System/Security")?.Attributes?["UserID"]?.Value;
             var messageNode = node.SelectSingleNode("RenderingInfo/Message");
             var message = messageNode?.InnerText ?? string.Empty;
 
