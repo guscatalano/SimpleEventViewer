@@ -489,6 +489,11 @@
                     <TextBlock Text="" Margin="0,8,0,0" />
                     <TextBlock Text="Created by Gus Catalano" FontWeight="SemiBold" />
                     <HyperlinkButton Content="github.com/guscatalano" NavigateUri="https://github.com/guscatalano" Padding="0" />
+                    <TextBlock Text="" Margin="0,8,0,0" />
+                    <TextBlock Text="© 2026 Gus Catalano" Opacity="0.7" FontSize="12" />
+                    <HyperlinkButton Content="MIT License"
+                                     NavigateUri="https://github.com/guscatalano/SimpleEventViewer/blob/main/LICENSE"
+                                     Padding="0" />
                 </StackPanel>
             </Border>
 
