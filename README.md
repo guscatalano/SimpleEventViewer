@@ -103,6 +103,7 @@ Optional in-process server that exposes the currently-loaded events to an LLM cl
 - Default port: `7321`
 - Single endpoint: `POST http://127.0.0.1:<port>/` accepts JSON-RPC 2.0 messages
 - Supported methods: `initialize`, `tools/list`, `tools/call`, `ping`
+- Multiple instances: enable **Auto-pick port** in Settings to let each window bind its own port. A discovery file at `%LOCALAPPDATA%\Packages\…\LocalState\mcp-instances.json` lists every live instance as `{pid, port, started_at}`.
 
 Available tools:
 
@@ -113,15 +114,21 @@ Available tools:
 | `list_events` | Newest-first slice of events with `limit`, `offset`, optional `level` / `source` filters |
 | `search_events` | Case-insensitive substring search across event messages |
 | `get_event` | Full details of a specific event by its newest-first index |
+| `load_live_logs` | Switch the running app to the live Windows event log and reload |
+| `load_evtx_file` | Load a `.evtx` file in the running app (`path`: absolute path on the local filesystem) |
 
 Quick sanity check from a shell:
 
 ```pwsh
 curl http://127.0.0.1:7321/
-# {"server":"SimpleEventViewer","version":"1.2.0",...}
+# {"server":"SimpleEventViewer","version":"1.3.0",...}
 
 curl -X POST http://127.0.0.1:7321/ -H "Content-Type: application/json" `
      -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+
+# Ask the running app to load an EVTX file
+curl -X POST http://127.0.0.1:7321/ -H "Content-Type: application/json" `
+     -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"load_evtx_file","arguments":{"path":"C:\\logs\\System.evtx"}}}'
 ```
 
 ## Architecture

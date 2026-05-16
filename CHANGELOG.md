@@ -2,6 +2,22 @@
 
 All notable changes to Simple Event Viewer are documented here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] — 2026-05-16
+
+MCP server gains remote-control tools and learns to coexist with multiple instances.
+
+### Added
+- **Two new MCP tools**: `load_live_logs` switches the running app to the live Windows event log; `load_evtx_file` loads a `.evtx` file from disk. Both dispatch back to the UI thread, so an LLM client can steer what the user is looking at.
+- **Auto-pick port** toggle in Settings. When the preferred MCP port is in use (typically another running instance), the listener probes the next 10 ports and binds the first free one. Each instance ends up on its own endpoint.
+- **Instance discovery file** at `%LOCALAPPDATA%\Packages\…\LocalState\mcp-instances.json` listing every live instance's `{pid, port, started_at}`. MCP clients can read it to find every endpoint at once. Path is shown in Settings and selectable for copy.
+
+### Changed
+- MCP Settings status row now reports the actual bound port and explains *why* the listener isn't running (e.g. `Port 7321 is in use — likely another Simple Event Viewer instance. Enable "Auto-pick port" below…`) instead of the generic "port may be in use" line.
+- Client config snippets in Settings (VS Code, Cursor, Claude Desktop, `claude mcp add`) now reflect the actually-bound port, not just the preferred one.
+
+### Fixed
+- Multi-instance settings conflicts: Settings are stored in shared per-package storage, so changes in one window could silently overwrite changes in another. Settings now shows a Warning InfoBar when a second instance is detected.
+
 ## [1.2.0] — 2026-05-15
 
 Quality-of-life pass on Settings, filters, and discoverability.

@@ -67,10 +67,35 @@ public sealed partial class SettingsPage : Page
         _initializingMcp = true;
         McpEnabledSwitch.IsOn = SettingsService.Instance.McpServerEnabled;
         McpPortBox.Value = SettingsService.Instance.McpServerPort;
+        McpAutoPortSwitch.IsOn = SettingsService.Instance.McpAutoPort;
         _initializingMcp = false;
         RefreshMcpStatus();
 
+        RefreshMultiInstanceWarning();
+
         UpdateSwatches(color);
+    }
+
+    /// <summary>
+    /// Settings live in <c>ApplicationData.Current.LocalSettings</c>, which is
+    /// shared across every instance of the packaged app. With two windows
+    /// open the in-memory caches diverge and the on-disk store goes
+    /// last-write-wins, which can silently overwrite a change the user just
+    /// made in the other window. Surface that as a warning when we detect
+    /// another instance.
+    /// </summary>
+    private void RefreshMultiInstanceWarning()
+    {
+        try
+        {
+            var name = System.Diagnostics.Process.GetCurrentProcess().ProcessName;
+            var count = System.Diagnostics.Process.GetProcessesByName(name).Length;
+            MultiInstanceInfoBar.IsOpen = count > 1;
+        }
+        catch
+        {
+            MultiInstanceInfoBar.IsOpen = false;
+        }
     }
 
     private void RememberColumnWidthsSwitch_Toggled(object sender, RoutedEventArgs e)
@@ -235,7 +260,8 @@ public sealed partial class SettingsPage : Page
         SettingsService.Instance.McpServerEnabled = McpEnabledSwitch.IsOn;
         EventLogMcpServer.Instance.ApplyConfiguration(
             SettingsService.Instance.McpServerEnabled,
-            SettingsService.Instance.McpServerPort);
+            SettingsService.Instance.McpServerPort,
+            SettingsService.Instance.McpAutoPort);
         RefreshMcpStatus();
     }
 
@@ -248,7 +274,22 @@ public sealed partial class SettingsPage : Page
         SettingsService.Instance.McpServerPort = port;
         if (SettingsService.Instance.McpServerEnabled)
         {
-            EventLogMcpServer.Instance.ApplyConfiguration(true, port);
+            EventLogMcpServer.Instance.ApplyConfiguration(
+                true, port, SettingsService.Instance.McpAutoPort);
+        }
+        RefreshMcpStatus();
+    }
+
+    private void McpAutoPortSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_initializingMcp) return;
+        SettingsService.Instance.McpAutoPort = McpAutoPortSwitch.IsOn;
+        if (SettingsService.Instance.McpServerEnabled)
+        {
+            EventLogMcpServer.Instance.ApplyConfiguration(
+                true,
+                SettingsService.Instance.McpServerPort,
+                SettingsService.Instance.McpAutoPort);
         }
         RefreshMcpStatus();
     }
@@ -256,15 +297,29 @@ public sealed partial class SettingsPage : Page
     private void RefreshMcpStatus()
     {
         var running = EventLogMcpServer.Instance.IsRunning;
-        var port = SettingsService.Instance.McpServerPort;
+        var preferred = SettingsService.Instance.McpServerPort;
+        var bound = EventLogMcpServer.Instance.Port;
+        var portForSnippets = running ? bound : preferred;
+
         if (running)
         {
-            McpStatusText.Text = $"Running on 127.0.0.1:{port}";
-            McpEndpointText.Text = $"Endpoint: http://127.0.0.1:{port}/";
+            if (bound != preferred && SettingsService.Instance.McpAutoPort)
+            {
+                McpStatusText.Text =
+                    $"Running on 127.0.0.1:{bound} (preferred {preferred} was in use; auto-port took {bound})";
+            }
+            else
+            {
+                McpStatusText.Text = $"Running on 127.0.0.1:{bound}";
+            }
+            McpEndpointText.Text = $"Endpoint: http://127.0.0.1:{bound}/";
         }
         else if (SettingsService.Instance.McpServerEnabled)
         {
-            McpStatusText.Text = "Enabled, but listener is not running (port may be in use)";
+            var err = EventLogMcpServer.Instance.LastStartError;
+            McpStatusText.Text = !string.IsNullOrEmpty(err)
+                ? $"Not running — {err}"
+                : "Enabled, but listener is not running (port may be in use)";
             McpEndpointText.Text = string.Empty;
         }
         else
@@ -273,8 +328,10 @@ public sealed partial class SettingsPage : Page
             McpEndpointText.Text = string.Empty;
         }
 
+        McpDiscoveryPathText.Text = EventLogMcpServer.DiscoveryFilePath;
+
         // Refresh client config snippets with the current port.
-        var url = $"http://127.0.0.1:{port}/";
+        var url = $"http://127.0.0.1:{portForSnippets}/";
 
         VsCodeConfigBox.Text =
             "{\r\n" +

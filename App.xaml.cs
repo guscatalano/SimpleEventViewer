@@ -89,7 +89,8 @@ public partial class App : Application
         {
             SimpleEventViewer.Services.Mcp.EventLogMcpServer.Instance.ApplyConfiguration(
                 SimpleEventViewer.Services.SettingsService.Instance.McpServerEnabled,
-                SimpleEventViewer.Services.SettingsService.Instance.McpServerPort);
+                SimpleEventViewer.Services.SettingsService.Instance.McpServerPort,
+                SimpleEventViewer.Services.SettingsService.Instance.McpAutoPort);
         }
         catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[App] mcp apply failed: {ex}"); }
     }

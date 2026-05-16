@@ -49,6 +49,7 @@ public class SettingsService
     private const string DetailFieldVisibilityKey = "DetailFieldVisibility";
     private const string McpServerEnabledKey = "McpServerEnabled";
     private const string McpServerPortKey = "McpServerPort";
+    private const string McpAutoPortKey = "McpAutoPort";
     private const string ExperimentalFormatsKey = "ExperimentalFileFormats";
     private const string MultiSelectKeyPrefix = "FilterMultiSelect_";
     private const string TitleFormatKey = "TitleFormat";
@@ -501,6 +502,29 @@ public class SettingsService
     }
 
     /// <summary>
+    /// When true, if the preferred MCP port is in use the server probes
+    /// successive ports and binds the first free one. Lets multiple app
+    /// instances each host their own MCP endpoint instead of silently
+    /// failing on the second window.
+    /// </summary>
+    public bool McpAutoPort
+    {
+        get
+        {
+            try
+            {
+                if (ApplicationData.Current.LocalSettings.Values[McpAutoPortKey] is bool b) return b;
+            }
+            catch { }
+            return false;
+        }
+        set
+        {
+            try { ApplicationData.Current.LocalSettings.Values[McpAutoPortKey] = value; } catch { }
+        }
+    }
+
+    /// <summary>
     /// Reset every persisted preference to its first-launch default. Fires
     /// the change events on each affected setting so currently-open pages
     /// can rehydrate their controls without a restart.
@@ -519,6 +543,7 @@ public class SettingsService
             s.Remove(ColumnVisibilityKey);
             s.Remove(McpServerEnabledKey);
             s.Remove(McpServerPortKey);
+            s.Remove(McpAutoPortKey);
             s.Remove(ExperimentalFormatsKey);
             s.Remove(TitleFormatKey);
             s.Remove(FilterVisibilityKey);

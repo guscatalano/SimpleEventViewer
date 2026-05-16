@@ -110,6 +110,11 @@ public sealed partial class MainPage : Page
         UpdateExperimentalButtons();
         UpdateWindowTitle();
 
+        Services.Mcp.EventLogMcpServer.Instance.OnLoadLiveRequested = () =>
+            DispatcherQueue.TryEnqueue(() => ViewModel.LoadLiveLogs());
+        Services.Mcp.EventLogMcpServer.Instance.OnLoadFileRequested = path =>
+            DispatcherQueue.TryEnqueue(() => ViewModel.LoadFile(path, "evtx"));
+
         var startupFile = (Application.Current as App)?.StartupFilePath;
         if (!string.IsNullOrEmpty(startupFile))
         {

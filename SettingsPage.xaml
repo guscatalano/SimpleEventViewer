@@ -20,17 +20,26 @@
                 Background="{ThemeResource LayerFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="0,0,0,1">
-            <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-                <Button x:Name="BackButton"
-                        Click="BackButton_Click" Padding="14,8"
-                        AutomationProperties.Name="Back"
-                        ToolTipService.ToolTip="Back to events">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <FontIcon Glyph="&#xE72B;" FontSize="16" />
-                        <TextBlock Text="Back" FontSize="14" FontWeight="SemiBold" />
-                    </StackPanel>
-                </Button>
-                <TextBlock Text="Settings" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <StackPanel Spacing="10">
+                <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                    <Button x:Name="BackButton"
+                            Click="BackButton_Click" Padding="14,8"
+                            AutomationProperties.Name="Back"
+                            ToolTipService.ToolTip="Back to events">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE72B;" FontSize="16" />
+                            <TextBlock Text="Back" FontSize="14" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Text="Settings" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <InfoBar x:Name="MultiInstanceInfoBar"
+                         IsOpen="False"
+                         Severity="Warning"
+                         IsClosable="False"
+                         Title="Another Simple Event Viewer window is running"
+                         Message="Settings are shared across all open instances. Changes here apply to every window, and the most recent write wins — if you and the other window edit different settings at the same time, one of the edits may be overwritten. Close the other instance for a clean slate." />
             </StackPanel>
         </Border>
 
@@ -354,7 +363,29 @@
                                    Width="160" />
                     </Grid>
 
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Auto-pick port if in use" FontWeight="SemiBold" />
+                            <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+                                       Text="If the preferred port is busy (typically another running Simple Event Viewer instance), probe the next 10 ports and bind the first free one. Each instance ends up on its own port; see the discovery file below for the full list." />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" x:Name="McpAutoPortSwitch"
+                                      MinWidth="200" HorizontalAlignment="Right"
+                                      Toggled="McpAutoPortSwitch_Toggled" />
+                    </Grid>
+
                     <TextBlock x:Name="McpEndpointText" FontSize="12" Opacity="0.8" FontFamily="Consolas" />
+
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="Instance discovery file" FontWeight="SemiBold" FontSize="13" />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+                                   Text="JSON list of every running instance's PID and port. MCP clients can read this to find all live endpoints." />
+                        <TextBlock x:Name="McpDiscoveryPathText" FontFamily="Consolas" FontSize="11" Opacity="0.85" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                    </StackPanel>
 
                     <!-- Client configuration examples -->
                     <StackPanel Spacing="12" Margin="0,8,0,0">

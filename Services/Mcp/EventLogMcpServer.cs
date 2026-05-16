@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using SimpleEventViewer.Models;
+using Windows.Storage;
 
 namespace SimpleEventViewer.Services.Mcp;
 
@@ -32,59 +33,152 @@ public sealed class EventLogMcpServer
 
     private const string ProtocolVersion = "2024-11-05";
     private const string ServerName = "SimpleEventViewer";
-    private const string ServerVersion = "1.2.0";
+    private const string ServerVersion = "1.3.0";
+
+    /// <summary>
+    /// Max ports to probe above the preferred port when auto-port is on. So
+    /// with default 7321, we'll try 7321..7330. Keeps the scan bounded so a
+    /// totally-saturated range fails fast.
+    /// </summary>
+    private const int AutoPortScanCount = 10;
 
     public bool IsRunning => _listener?.IsListening == true;
+
+    /// <summary>The port we are actually bound to (may differ from the
+    /// preferred port when AutoPort took the next available slot).</summary>
     public int Port { get; private set; }
+
+    /// <summary>The port the user asked for in settings.</summary>
+    public int PreferredPort { get; private set; }
+
+    public bool AutoPortEnabled { get; private set; }
+
+    /// <summary>
+    /// Set when Start() fails. Cleared on successful Start or when AutoPort
+    /// salvages the situation by binding a different port. The Settings UI
+    /// shows this to explain why the listener isn't running.
+    /// </summary>
+    public string? LastStartError { get; private set; }
+
+    /// <summary>
+    /// Discovery file listing every running Simple Event Viewer instance that
+    /// is hosting an MCP server. MCP clients can read this to find all
+    /// instances (PID + port). Path is exposed in Settings so users can copy
+    /// it.
+    /// </summary>
+    public static string DiscoveryFilePath
+    {
+        get
+        {
+            try { return Path.Combine(ApplicationData.Current.LocalFolder.Path, "mcp-instances.json"); }
+            catch { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SimpleEventViewer", "mcp-instances.json"); }
+        }
+    }
+
+    /// <summary>
+    /// Hook for the load_live_logs tool. The UI layer sets this so the MCP
+    /// server can ask MainViewModel to reload the live Windows event log on
+    /// the UI thread.
+    /// </summary>
+    public Action? OnLoadLiveRequested { get; set; }
+
+    /// <summary>
+    /// Hook for the load_evtx_file tool. The UI layer sets this so the MCP
+    /// server can ask MainViewModel to load a given EVTX file on the UI
+    /// thread. Receives the absolute file path.
+    /// </summary>
+    public Action<string>? OnLoadFileRequested { get; set; }
 
     private EventLogMcpServer() { }
 
     /// <summary>
     /// Start the listener on 127.0.0.1:port. Idempotent — calling Start while
-    /// running on the same port is a no-op; on a different port restarts.
+    /// running on the same configuration is a no-op; otherwise restarts.
+    ///
+    /// When <paramref name="autoPort"/> is true, if the preferred port is in
+    /// use the listener probes the next <see cref="AutoPortScanCount"/> ports
+    /// before giving up. Throws <see cref="HttpListenerException"/> if no
+    /// port could be bound.
     /// </summary>
-    public void Start(int port)
+    public void Start(int port, bool autoPort)
     {
-        if (IsRunning && Port == port) return;
+        if (IsRunning && PreferredPort == port && AutoPortEnabled == autoPort) return;
         Stop();
 
-        var listener = new HttpListener();
-        listener.Prefixes.Add($"http://127.0.0.1:{port}/");
-        listener.Start();
-        _listener = listener;
-        Port = port;
+        PreferredPort = port;
+        AutoPortEnabled = autoPort;
+        LastStartError = null;
+
+        var attempts = autoPort ? AutoPortScanCount : 1;
+        HttpListener? bound = null;
+        int boundPort = port;
+        HttpListenerException? lastEx = null;
+
+        for (int i = 0; i < attempts; i++)
+        {
+            var tryPort = port + i;
+            try
+            {
+                var l = new HttpListener();
+                l.Prefixes.Add($"http://127.0.0.1:{tryPort}/");
+                l.Start();
+                bound = l;
+                boundPort = tryPort;
+                break;
+            }
+            catch (HttpListenerException ex)
+            {
+                lastEx = ex;
+            }
+        }
+
+        if (bound == null)
+        {
+            LastStartError = autoPort
+                ? $"Ports {port}–{port + attempts - 1} are all in use. Another app (or {attempts} other Simple Event Viewer instances) is holding them."
+                : $"Port {port} is in use — likely another Simple Event Viewer instance. Enable \"Auto-pick port\" below to bind the next free port.";
+            throw lastEx ?? new HttpListenerException();
+        }
+
+        _listener = bound;
+        Port = boundPort;
 
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
-        _runTask = Task.Run(() => RunLoop(listener, token), token);
+        _runTask = Task.Run(() => RunLoop(bound, token), token);
+
+        WriteDiscoveryEntry();
     }
 
     /// <summary>
     /// Convenience entry point: start if enabled, stop if not. Used both at
     /// app startup and when the user changes the toggle in settings.
     /// </summary>
-    public void ApplyConfiguration(bool enabled, int port)
+    public void ApplyConfiguration(bool enabled, int port, bool autoPort)
     {
         if (!enabled)
         {
             Stop();
+            LastStartError = null;
             return;
         }
         try
         {
-            Start(port);
+            Start(port, autoPort);
         }
         catch (HttpListenerException ex)
         {
-            // Port in use, ACL missing, etc. Surface via Debug; UI can show this
-            // by polling IsRunning after toggling.
-            System.Diagnostics.Debug.WriteLine($"MCP server failed to start on port {port}: {ex.Message}");
+            // LastStartError was set in Start; this catch suppresses the
+            // exception for the UI's benefit. Settings polls IsRunning +
+            // LastStartError to render the status row.
+            System.Diagnostics.Debug.WriteLine($"MCP server failed to start on port {port} (autoPort={autoPort}): {ex.Message}");
             Stop();
         }
     }
 
     public void Stop()
     {
+        RemoveDiscoveryEntry();
         try { _cts?.Cancel(); } catch { }
         try { _listener?.Stop(); } catch { }
         try { _listener?.Close(); } catch { }
@@ -92,6 +186,72 @@ public sealed class EventLogMcpServer
         _cts = null;
         _runTask = null;
     }
+
+    private void WriteDiscoveryEntry()
+    {
+        try
+        {
+            var path = DiscoveryFilePath;
+            var dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+            var entries = ReadDiscoveryEntries();
+            var pid = Environment.ProcessId;
+            entries.RemoveAll(e => e.pid == pid || !IsProcessAlive(e.pid));
+            entries.Add(new DiscoveryEntry(pid, Port, DateTime.UtcNow.ToString("o")));
+
+            File.WriteAllText(path, JsonSerializer.Serialize(
+                entries,
+                new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"MCP discovery write failed: {ex.Message}");
+        }
+    }
+
+    private void RemoveDiscoveryEntry()
+    {
+        try
+        {
+            var path = DiscoveryFilePath;
+            if (!File.Exists(path)) return;
+            var entries = ReadDiscoveryEntries();
+            var pid = Environment.ProcessId;
+            entries.RemoveAll(e => e.pid == pid);
+            if (entries.Count == 0)
+                File.Delete(path);
+            else
+                File.WriteAllText(path, JsonSerializer.Serialize(
+                    entries,
+                    new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch { }
+    }
+
+    private static List<DiscoveryEntry> ReadDiscoveryEntries()
+    {
+        try
+        {
+            var path = DiscoveryFilePath;
+            if (!File.Exists(path)) return new List<DiscoveryEntry>();
+            var json = File.ReadAllText(path);
+            return JsonSerializer.Deserialize<List<DiscoveryEntry>>(json) ?? new List<DiscoveryEntry>();
+        }
+        catch { return new List<DiscoveryEntry>(); }
+    }
+
+    private static bool IsProcessAlive(int pid)
+    {
+        try
+        {
+            using var _ = System.Diagnostics.Process.GetProcessById(pid);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    private record DiscoveryEntry(int pid, int port, string started_at);
 
     private async Task RunLoop(HttpListener listener, CancellationToken token)
     {
@@ -296,6 +456,30 @@ public sealed class EventLogMcpServer
                     },
                     ["required"] = new JsonArray { "index" }
                 }
+            },
+            new JsonObject
+            {
+                ["name"] = "load_live_logs",
+                ["description"] = "Switch the running app to the live Windows event log and reload. Returns immediately; call current_source after a moment to confirm.",
+                ["inputSchema"] = new JsonObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject()
+                }
+            },
+            new JsonObject
+            {
+                ["name"] = "load_evtx_file",
+                ["description"] = "Load a .evtx file in the running app. Returns immediately. The file must exist on the local filesystem and be readable by the app.",
+                ["inputSchema"] = new JsonObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject
+                    {
+                        ["path"] = new JsonObject { ["type"] = "string", ["description"] = "Absolute path to a .evtx file" }
+                    },
+                    ["required"] = new JsonArray { "path" }
+                }
             }
         };
     }
@@ -309,12 +493,14 @@ public sealed class EventLogMcpServer
         {
             JsonNode? payload = name switch
             {
-                "current_source" => Tool_CurrentSource(),
-                "event_summary"  => Tool_EventSummary(),
-                "list_events"    => Tool_ListEvents(args),
-                "search_events"  => Tool_SearchEvents(args),
-                "get_event"      => Tool_GetEvent(args),
-                _                => null
+                "current_source"  => Tool_CurrentSource(),
+                "event_summary"   => Tool_EventSummary(),
+                "list_events"     => Tool_ListEvents(args),
+                "search_events"   => Tool_SearchEvents(args),
+                "get_event"       => Tool_GetEvent(args),
+                "load_live_logs"  => Tool_LoadLiveLogs(),
+                "load_evtx_file"  => Tool_LoadEvtxFile(args),
+                _                 => null
             };
 
             if (payload == null)
@@ -500,6 +686,62 @@ public sealed class EventLogMcpServer
             ["computer"] = e.Computer,
             ["message"] = e.Message,
             ["xml"] = e.Xml
+        };
+    }
+
+    private JsonNode Tool_LoadLiveLogs()
+    {
+        if (OnLoadLiveRequested == null)
+        {
+            return new JsonObject
+            {
+                ["status"] = "error",
+                ["message"] = "The app is not currently running an active UI bound to the MCP server. " +
+                              "Launch Simple Event Viewer and enable the MCP server in Settings."
+            };
+        }
+        OnLoadLiveRequested.Invoke();
+        return new JsonObject
+        {
+            ["status"] = "ok",
+            ["message"] = "Live Windows event log load requested. Call current_source in a few seconds to confirm."
+        };
+    }
+
+    private JsonNode Tool_LoadEvtxFile(JsonObject? args)
+    {
+        var path = args?["path"]?.GetValue<string>();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return new JsonObject { ["status"] = "error", ["message"] = "'path' argument is required" };
+        }
+        if (!System.IO.File.Exists(path))
+        {
+            return new JsonObject { ["status"] = "error", ["message"] = $"File not found: {path}" };
+        }
+        if (!path.EndsWith(".evtx", StringComparison.OrdinalIgnoreCase))
+        {
+            return new JsonObject
+            {
+                ["status"] = "error",
+                ["message"] = "Only .evtx files are supported by this tool. " +
+                              "Pass a path ending in .evtx."
+            };
+        }
+        if (OnLoadFileRequested == null)
+        {
+            return new JsonObject
+            {
+                ["status"] = "error",
+                ["message"] = "The app is not currently running an active UI bound to the MCP server."
+            };
+        }
+        OnLoadFileRequested.Invoke(path);
+        return new JsonObject
+        {
+            ["status"] = "ok",
+            ["message"] = $"EVTX load requested for {System.IO.Path.GetFileName(path)}. " +
+                          "Call current_source / event_summary in a few seconds to confirm."
         };
     }
 
