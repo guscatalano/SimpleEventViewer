@@ -140,6 +140,11 @@ public class UiSmokeTests : IDisposable
         var window = _app!.GetMainWindow(_automation, TimeSpan.FromSeconds(15));
         Assert.NotNull(window);
 
+        // Persisted Settings from prior sessions may have hidden some filter
+        // sections via "Visible filter sections". Re-enable everything before
+        // asserting that each label is present.
+        EnsureAllFilterSectionsVisible(window);
+
         var labels = new[] { "Event Source", "Time Range", "Event Level", "Message", "User", "Process", "Computer" };
         foreach (var label in labels)
         {
@@ -147,6 +152,307 @@ public class UiSmokeTests : IDisposable
                 cf.ByControlType(ControlType.Text).And(cf.ByName(label)));
             Assert.True(found != null, $"Expected filter section '{label}'");
         }
+    }
+
+    /// <summary>
+    /// Open Settings, walk the "Visible filter sections" checkbox list, check
+    /// any that are off, then go back. Idempotent — does nothing if everything
+    /// is already on.
+    /// </summary>
+    private void EnsureAllFilterSectionsVisible(Window window)
+    {
+        var settingsBtn = window.FindFirstDescendant(cf => cf.ByName("Settings"));
+        Assert.True(settingsBtn != null, "Settings button not found");
+        ClickElement(settingsBtn!);
+        Thread.Sleep(1000);
+
+        // Section labels match SettingsService.AvailableFilterSections.
+        var sectionLabels = new[]
+        {
+            "Time Range", "Event Source", "Event Level", "Event ID",
+            "Message", "User", "Process", "Computer", "Channel"
+        };
+
+        foreach (var label in sectionLabels)
+        {
+            // Multiple checkboxes named (e.g.) "User" exist across the page —
+            // pick the one inside the filter-visibility list specifically.
+            // Easiest: find ALL checkboxes with that name and check whichever
+            // is not yet checked. False-positives are fine (idempotent toggle).
+            var checks = window.FindAllDescendants(cf =>
+                cf.ByControlType(ControlType.CheckBox).And(cf.ByName(label)));
+            foreach (var cb in checks)
+            {
+                var toggle = cb.Patterns.Toggle.PatternOrDefault;
+                if (toggle == null) continue;
+                if (toggle.ToggleState.Value != FlaUI.Core.Definitions.ToggleState.On)
+                {
+                    toggle.Toggle();
+                    Thread.Sleep(80);
+                }
+            }
+        }
+
+        // Back to events.
+        var backBtn = window.FindFirstDescendant(cf =>
+            cf.ByControlType(ControlType.Button).And(cf.ByName("Back")));
+        Assert.True(backBtn != null, "Back button not found");
+        ClickElement(backBtn!);
+        Thread.Sleep(1200);
+    }
+
+    [Fact]
+    public void App_StatusBarShowsLiveSource()
+    {
+        if (!_canRun) return;
+        var window = _app!.GetMainWindow(_automation, TimeSpan.FromSeconds(15));
+        Assert.NotNull(window);
+
+        // Status bar shows the loaded source via ViewModel.CurrentSource.
+        // On a fresh launch with no CLI arg, this is "Live system logs".
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+        AutomationElement? found = null;
+        while (DateTime.UtcNow < deadline && found == null)
+        {
+            found = window.FindFirstDescendant(cf =>
+                cf.ByControlType(ControlType.Text).And(cf.ByName("Live system logs")));
+            if (found == null) Thread.Sleep(300);
+        }
+        Assert.True(found != null, "Status bar should display 'Live system logs'");
+    }
+
+    [Fact]
+    public void App_TitleContainsLoadedSource()
+    {
+        if (!_canRun) return;
+        var window = _app!.GetMainWindow(_automation, TimeSpan.FromSeconds(15));
+        Assert.NotNull(window);
+
+        // Title format includes the source (default layout: "source — Simple Event Viewer").
+        // Wait a beat so CurrentSource has propagated into Window.Title.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (window.Title.Contains("Live system logs") &&
+                window.Title.Contains("Simple Event Viewer"))
+            {
+                return; // pass
+            }
+            Thread.Sleep(300);
+        }
+        Assert.Fail($"Expected window title to contain both source + app name, saw '{window.Title}'");
+    }
+
+    [Fact]
+    public void App_RefreshButtonShowsContextualLabel()
+    {
+        if (!_canRun) return;
+        var window = _app!.GetMainWindow(_automation, TimeSpan.FromSeconds(15));
+        Assert.NotNull(window);
+
+        // For live system logs (the default state), Refresh button label
+        // reads "Refresh live logs", not the generic "Refresh".
+        var refresh = window.FindFirstDescendant(cf =>
+            cf.ByControlType(ControlType.Button).And(cf.ByName("Refresh live logs")));
+        Assert.True(refresh != null,
+            "Expected a toolbar button labeled 'Refresh live logs' for live source");
+    }
+
+    [Fact]
+    public void App_OpenMenuListsExpectedSources()
+    {
+        if (!_canRun) return;
+        var window = _app!.GetMainWindow(_automation, TimeSpan.FromSeconds(15));
+        Assert.NotNull(window);
+
+        // Click the Open dropdown to reveal its menu.
+        var openBtn = window.FindFirstDescendant(cf => cf.ByName("Open"));
+        Assert.True(openBtn != null, "Open toolbar button not found");
+        ClickElement(openBtn!);
+        Thread.Sleep(500);
+
+        // Menu items appear in a popup that may be outside the window's UIA
+        // subtree, so search from the desktop root.
+        var liveItem = _automation.GetDesktop().FindFirstDescendant(cf =>
+            cf.ByName("Live Windows event log"));
+        Assert.True(liveItem != null, "Open menu should contain 'Live Windows event log'");
+
+        // Two plausible spellings depending on Windows-rendered ellipsis.
+        var evtxItem = _automation.GetDesktop().FindFirstDescendant(cf =>
+            cf.ByName("EVTX file…").Or(cf.ByName("EVTX file...")));
+        Assert.True(evtxItem != null, "Open menu should contain 'EVTX file' entry");
+
+        // Dismiss the menu so it doesn't leak into the next test.
+        FlaUI.Core.Input.Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
+        Thread.Sleep(200);
+    }
+
+    [Fact]
+    public void App_CtrlFOpensFindBar()
+    {
+        if (!_canRun) return;
+        var window = _app!.GetMainWindow(_automation, TimeSpan.FromSeconds(15));
+        Assert.NotNull(window);
+        window.SetForeground();
+        Thread.Sleep(300);
+
+        // Find bar starts collapsed. Ctrl+F should reveal it with focus on
+        // the TextBox whose PlaceholderText is "Find in message, source, level…".
+        FlaUI.Core.Input.Keyboard.TypeSimultaneously(
+            FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL,
+            FlaUI.Core.WindowsAPI.VirtualKeyShort.KEY_F);
+        Thread.Sleep(500);
+
+        // The TextBox has no explicit name; find by automation id via x:Name="FindBox".
+        var findBox = window.FindFirstDescendant(cf => cf.ByAutomationId("FindBox"));
+        Assert.True(findBox != null && findBox.IsOffscreen == false,
+            "Ctrl+F should reveal the FindBox TextBox in the toolbar");
+
+        // Close the find bar via Escape so app state is clean for the next test.
+        FlaUI.Core.Input.Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
+        Thread.Sleep(200);
+    }
+
+    [Fact]
+    public void App_SettingsOpensAndBackReturns()
+    {
+        if (!_canRun) return;
+        var window = _app!.GetMainWindow(_automation, TimeSpan.FromSeconds(15));
+        Assert.NotNull(window);
+
+        // Open Settings via gear button.
+        var settingsBtn = window.FindFirstDescendant(cf => cf.ByName("Settings"));
+        Assert.True(settingsBtn != null, "Settings button not found");
+        ClickElement(settingsBtn!);
+        Thread.Sleep(1200);
+
+        // Verify we're on Settings — title bar text "Settings" + at least one
+        // nav item like "Theme & Colors".
+        var settingsTitle = window.FindFirstDescendant(cf =>
+            cf.ByControlType(ControlType.Text).And(cf.ByName("Settings")));
+        Assert.True(settingsTitle != null, "Settings title not found after click");
+
+        var themeNav = window.FindFirstDescendant(cf =>
+            cf.ByControlType(ControlType.ListItem).And(cf.ByName("Theme & Colors")));
+        Assert.True(themeNav != null, "Theme & Colors nav item missing");
+
+        // Click Back to return to MainPage.
+        var backBtn = window.FindFirstDescendant(cf =>
+            cf.ByControlType(ControlType.Button).And(cf.ByName("Back")));
+        Assert.True(backBtn != null, "Back button not found");
+        ClickElement(backBtn!);
+        Thread.Sleep(1200);
+
+        // Verify we're back — DataGrid should be reachable.
+        var grid = window.FindFirstDescendant(cf => cf.ByControlType(ControlType.DataGrid));
+        Assert.True(grid != null, "Events DataGrid should be visible after Back");
+    }
+
+    [Fact]
+    public void App_SettingsNavBarHasExpectedSections()
+    {
+        if (!_canRun) return;
+        var window = _app!.GetMainWindow(_automation, TimeSpan.FromSeconds(15));
+        Assert.NotNull(window);
+
+        var settingsBtn = window.FindFirstDescendant(cf => cf.ByName("Settings"));
+        Assert.True(settingsBtn != null, "Settings button not found");
+        ClickElement(settingsBtn!);
+        Thread.Sleep(1200);
+
+        // Every NavigationViewItem from the settings left pane should be present.
+        var expected = new[]
+        {
+            "Theme & Colors", "Window", "Events grid", "Event details pane",
+            "Filter panel", "Filter multi-select", "Experimental",
+            "MCP server", "Restore defaults", "About"
+        };
+        var missing = new List<string>();
+        foreach (var name in expected)
+        {
+            var item = window.FindFirstDescendant(cf =>
+                cf.ByControlType(ControlType.ListItem).And(cf.ByName(name)));
+            if (item == null) missing.Add(name);
+        }
+
+        // Get back to MainPage either way so subsequent tests aren't on Settings.
+        var backBtn = window.FindFirstDescendant(cf =>
+            cf.ByControlType(ControlType.Button).And(cf.ByName("Back")));
+        if (backBtn != null) ClickElement(backBtn);
+        Thread.Sleep(800);
+
+        Assert.True(missing.Count == 0, "Missing nav items: " + string.Join(", ", missing));
+    }
+
+    [Fact]
+    public void App_MessageSearchNarrowsGrid()
+    {
+        if (!_canRun) return;
+        var window = _app!.GetMainWindow(_automation, TimeSpan.FromSeconds(15));
+        Assert.NotNull(window);
+
+        EnsureAllFilterSectionsVisible(window);
+
+        // Wait until rows are loaded so we have a baseline count.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(45);
+        int initialRows = 0;
+        while (DateTime.UtcNow < deadline)
+        {
+            initialRows = CountDataGridRows(window);
+            if (initialRows >= 5) break;
+            Thread.Sleep(500);
+        }
+        if (initialRows < 5)
+        {
+            // Skip — not enough data to make a meaningful narrowing assertion.
+            return;
+        }
+
+        // The Message filter is a TextBox with PlaceholderText "Search messages…".
+        // Find it by walking TextBox controls inside the filter panel.
+        var searchBox = window.FindAllDescendants(cf => cf.ByControlType(ControlType.Edit))
+            .FirstOrDefault(e =>
+            {
+                try
+                {
+                    var name = e.Properties.HelpText.IsSupported ? e.Properties.HelpText.Value : "";
+                    return name.Contains("Search messages", StringComparison.OrdinalIgnoreCase);
+                }
+                catch { return false; }
+            });
+        if (searchBox == null) return; // best-effort; skip if we can't find it
+
+        searchBox.Focus();
+        Thread.Sleep(200);
+        // A 6-char random-ish substring is unlikely to match every row.
+        FlaUI.Core.Input.Keyboard.Type("zzqxyz");
+        Thread.Sleep(800);
+
+        var narrowedRows = CountDataGridRows(window);
+        Assert.True(narrowedRows < initialRows,
+            $"Expected message search to narrow the grid; before={initialRows}, after={narrowedRows}");
+
+        // Clear so we don't leave the next test with an active filter.
+        searchBox.Focus();
+        FlaUI.Core.Input.Keyboard.TypeSimultaneously(
+            FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL,
+            FlaUI.Core.WindowsAPI.VirtualKeyShort.KEY_A);
+        FlaUI.Core.Input.Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.DELETE);
+        Thread.Sleep(400);
+    }
+
+    [Fact]
+    public void App_ClearAllFiltersButtonExists()
+    {
+        if (!_canRun) return;
+        var window = _app!.GetMainWindow(_automation, TimeSpan.FromSeconds(15));
+        Assert.NotNull(window);
+
+        EnsureAllFilterSectionsVisible(window);
+
+        var btn = window.FindFirstDescendant(cf =>
+            cf.ByControlType(ControlType.Button).And(cf.ByName("Clear All Filters")));
+        Assert.True(btn != null, "Clear All Filters button should be reachable");
     }
 
     [Fact]
@@ -373,6 +679,138 @@ public class UiSmokeTests : IDisposable
             invoke?.Invoke();
         }
         catch { }
+    }
+
+    /// <summary>
+    /// Regression test for "row tint doesn't refresh when color scheme
+    /// changes". Captures pixel samples from the DataGrid before and after
+    /// a scheme switch and asserts the colors actually change.
+    /// </summary>
+    [Fact]
+    public void RowTintRefreshesWhenColorSchemeChanges()
+    {
+        if (!_canRun) return;
+
+        var window = _app!.GetMainWindow(_automation, TimeSpan.FromSeconds(15));
+        Assert.NotNull(window);
+
+        // Wait for events to populate so there are tinted rows to sample.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(45);
+        while (CountDataGridRows(window) == 0 && DateTime.UtcNow < deadline)
+        {
+            Thread.Sleep(500);
+        }
+        Assert.True(CountDataGridRows(window) > 0, "Need at least one row to sample colors");
+
+        // Make sure we start from a known scheme so this test is deterministic.
+        // Default → produces a recognisable Info-blue tint for Information rows.
+        SetColorScheme(window, "Default");
+        Thread.Sleep(1500);
+
+        var grid = window.FindFirstDescendant(cf => cf.ByControlType(ControlType.DataGrid));
+        Assert.NotNull(grid);
+        var gridRect = grid!.BoundingRectangle;
+
+        // Sample several pixels from the first few rows. The DataGrid row
+        // height is roughly 32 px; the header occupies the first ~32 px.
+        // We pick a column that's wide and tinted (the User or Message column
+        // furthest from cell content).
+        var sampleY = new[] { 60, 90, 120, 150, 180 };
+        const int sampleX = 250; // somewhere inside the grid horizontally
+
+        var beforeColors = sampleY
+            .Select(y => GetPixelColor((int)gridRect.X + sampleX, (int)gridRect.Y + y))
+            .ToList();
+
+        // Now switch to a scheme that produces a clearly different tint —
+        // Forest (green Info) vs Default (blue Info) is easy to distinguish.
+        SetColorScheme(window, "Forest");
+        Thread.Sleep(2500);
+
+        var afterColors = sampleY
+            .Select(y => GetPixelColor((int)gridRect.X + sampleX, (int)gridRect.Y + y))
+            .ToList();
+
+        // Assert at least one row's tint changed by a visible amount.
+        var changed = 0;
+        for (int i = 0; i < beforeColors.Count; i++)
+        {
+            if (ColorDistance(beforeColors[i], afterColors[i]) > 8)
+            {
+                changed++;
+            }
+        }
+        Assert.True(changed >= beforeColors.Count - 1,
+            $"Expected nearly every sampled row pixel to change tint, got {changed}/{beforeColors.Count}. " +
+            $"Before: [{string.Join(",", beforeColors)}]  After: [{string.Join(",", afterColors)}]");
+    }
+
+    private static System.Drawing.Color GetPixelColor(int x, int y)
+    {
+        using var bmp = new System.Drawing.Bitmap(1, 1);
+        using var g = System.Drawing.Graphics.FromImage(bmp);
+        g.CopyFromScreen(x, y, 0, 0, new System.Drawing.Size(1, 1));
+        return bmp.GetPixel(0, 0);
+    }
+
+    private static int ColorDistance(System.Drawing.Color a, System.Drawing.Color b) =>
+        Math.Abs(a.R - b.R) + Math.Abs(a.G - b.G) + Math.Abs(a.B - b.B);
+
+    private void SetColorScheme(Window window, string schemeTag)
+    {
+        // Open Settings via the gear button (AutomationProperties.Name = "Settings").
+        var settingsBtn = window.FindFirstDescendant(cf => cf.ByName("Settings"));
+        Assert.True(settingsBtn != null, "Settings button not found");
+        ClickElement(settingsBtn!);
+        Thread.Sleep(1200);
+
+        var combo = window.FindFirstDescendant(cf => cf.ByAutomationId("ColorSchemeComboBox"));
+        Assert.True(combo != null, "ColorSchemeComboBox not found");
+
+        // Prefer the ExpandCollapse pattern — it's more reliable than mouse click
+        // for opening a ComboBox dropdown.
+        var expand = combo!.Patterns.ExpandCollapse.PatternOrDefault;
+        if (expand != null)
+        {
+            expand.Expand();
+        }
+        else
+        {
+            ClickElement(combo!);
+        }
+        Thread.Sleep(700);
+
+        // The ComboBox popup lives in its own visual tree root, so search from
+        // the desktop. Match either the ListItem (UIA's name for ComboBoxItem)
+        // or ComboBoxItem by name.
+        AutomationElement? item = null;
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(3);
+        while (DateTime.UtcNow < deadline && item == null)
+        {
+            item = _automation.GetDesktop().FindFirstDescendant(cf =>
+                cf.ByControlType(ControlType.ListItem).And(cf.ByName(schemeTag)));
+            if (item == null) Thread.Sleep(150);
+        }
+        Assert.True(item != null, $"ComboBoxItem '{schemeTag}' not found");
+
+        // Some ComboBox items support SelectionItem.Select() — use it when available.
+        var selectPattern = item!.Patterns.SelectionItem.PatternOrDefault;
+        if (selectPattern != null)
+        {
+            selectPattern.Select();
+        }
+        else
+        {
+            ClickElement(item!);
+        }
+        Thread.Sleep(1000);
+
+        // Back to events. The Back button is the labeled one in the title bar.
+        var backBtn = window.FindFirstDescendant(cf =>
+            cf.ByControlType(ControlType.Button).And(cf.ByName("Back")));
+        Assert.True(backBtn != null, "Back button not found");
+        ClickElement(backBtn!);
+        Thread.Sleep(1800);
     }
 
     private static int CountDataGridRows(Window window)

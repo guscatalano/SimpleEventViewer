@@ -18,7 +18,8 @@ public static class EventFilter
         string? searchTerms = null,
         string? processId = null,
         string? computer = null,
-        string? channel = null)
+        string? channel = null,
+        string? eventId = null)
     {
         return events.Where(e =>
             (string.IsNullOrEmpty(source) || e.ProviderName == source) &&
@@ -29,6 +30,7 @@ public static class EventFilter
             (string.IsNullOrEmpty(processId) || e.ProcessId.ToString() == processId) &&
             (string.IsNullOrEmpty(computer) || e.Computer == computer) &&
             (string.IsNullOrEmpty(channel) || e.Channel == channel) &&
+            (string.IsNullOrEmpty(eventId) || e.Id.ToString() == eventId) &&
             (string.IsNullOrEmpty(searchTerms) || e.Message.Contains(searchTerms, StringComparison.OrdinalIgnoreCase))
         ).OrderByDescending(e => e.TimeCreated).ToList();
     }
@@ -48,10 +50,19 @@ public static class EventFilter
         string? searchTerms,
         HashSet<string>? processIds,
         HashSet<string>? computers,
-        HashSet<string>? channels)
+        HashSet<string>? channels,
+        HashSet<string>? eventIds = null,
+        string? quickFind = null)
     {
         bool HasAny(HashSet<string>? s) => s != null && s.Count > 0;
         bool HasLevels(HashSet<LogLevel>? s) => s != null && s.Count > 0;
+        bool MatchesQuickFind(EventLogEntry e)
+        {
+            if (string.IsNullOrEmpty(quickFind)) return true;
+            return e.Message.Contains(quickFind, StringComparison.OrdinalIgnoreCase)
+                || e.ProviderName.Contains(quickFind, StringComparison.OrdinalIgnoreCase)
+                || e.LevelName.Contains(quickFind, StringComparison.OrdinalIgnoreCase);
+        }
 
         return events.Where(e =>
             (!HasAny(sources)     || sources!.Contains(e.ProviderName)) &&
@@ -62,7 +73,9 @@ public static class EventFilter
             (!HasAny(processIds)  || processIds!.Contains(e.ProcessId.ToString())) &&
             (!HasAny(computers)   || computers!.Contains(e.Computer ?? string.Empty)) &&
             (!HasAny(channels)    || channels!.Contains(e.Channel ?? string.Empty)) &&
-            (string.IsNullOrEmpty(searchTerms) || e.Message.Contains(searchTerms, StringComparison.OrdinalIgnoreCase))
+            (!HasAny(eventIds)    || eventIds!.Contains(e.Id.ToString())) &&
+            (string.IsNullOrEmpty(searchTerms) || e.Message.Contains(searchTerms, StringComparison.OrdinalIgnoreCase)) &&
+            MatchesQuickFind(e)
         ).OrderByDescending(e => e.TimeCreated).ToList();
     }
 }

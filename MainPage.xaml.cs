@@ -62,6 +62,30 @@ public sealed partial class MainPage : Page
         DispatcherQueue.TryEnqueue(UpdateWindowTitle);
     }
 
+    private void FindAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        FindBar.Visibility = Visibility.Visible;
+        FindBox.Focus(FocusState.Programmatic);
+        FindBox.SelectAll();
+        args.Handled = true;
+    }
+
+    private void FindBox_KeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == Windows.System.VirtualKey.Escape)
+        {
+            CloseFindBar_Click(sender, e);
+            e.Handled = true;
+        }
+    }
+
+    private void CloseFindBar_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.QuickFindText = string.Empty;
+        FindBar.Visibility = Visibility.Collapsed;
+        EventsDataGrid.Focus(FocusState.Programmatic);
+    }
+
     private void UpdateWindowTitle()
     {
         if (Application.Current is App app && app.MainWindow is MainWindow mw)
@@ -223,11 +247,23 @@ public sealed partial class MainPage : Page
 
     private void EventsDataGrid_RightTapped(object sender, RightTappedRoutedEventArgs e)
     {
-        // Capture the right-clicked cell value (for Copy cell)
+        var fe = e.OriginalSource as FrameworkElement;
+
+        // Header right-click? Walk up the visual tree looking for the column
+        // header element so we can show a column-specific menu (sort / hide /
+        // jump to filter) instead of the row Copy menu.
+        var headerColumn = FindOwningColumn(fe);
+        if (headerColumn != null)
+        {
+            var menu = BuildHeaderContextMenu(headerColumn);
+            menu.ShowAt(EventsDataGrid, e.GetPosition(EventsDataGrid));
+            e.Handled = true;
+            return;
+        }
+
+        // Row right-click → existing copy menu.
         _rightClickedCellValue = (e.OriginalSource as TextBlock)?.Text;
 
-        // If the right-clicked row isn't already in the selection, make it the only selection
-        var fe = e.OriginalSource as FrameworkElement;
         var dc = fe?.DataContext;
         if (dc is EventLogEntry entry && !EventsDataGrid.SelectedItems.Contains(entry))
         {
@@ -237,6 +273,254 @@ public sealed partial class MainPage : Page
 
         _rowContextMenu.ShowAt(EventsDataGrid, e.GetPosition(EventsDataGrid));
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// Walk up the visual tree from a right-clicked element looking for a
+    /// DataGridColumnHeader. If found, return the DataGridColumn it represents
+    /// (matched by Header content against our column collection).
+    /// </summary>
+    private DataGridColumn? FindOwningColumn(FrameworkElement? start)
+    {
+        // The CommunityToolkit DataGrid puts column headers in
+        // CommunityToolkit.WinUI.UI.Controls.Primitives.DataGridColumnHeader.
+        // Avoid a hard reference (the type lives in a different namespace
+        // across toolkit versions); identify by simple type name and grab the
+        // Content property reflectively.
+        DependencyObject? node = start;
+        while (node != null)
+        {
+            if (node.GetType().Name == "DataGridColumnHeader")
+            {
+                var contentProp = node.GetType().GetProperty("Content");
+                var headerContent = contentProp?.GetValue(node);
+                foreach (var col in EventsDataGrid.Columns)
+                {
+                    if (Equals(col.Header, headerContent)) return col;
+                }
+                return null;
+            }
+            node = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(node);
+        }
+        return null;
+    }
+
+    private MenuFlyout BuildHeaderContextMenu(DataGridColumn column)
+    {
+        var menu = new MenuFlyout();
+        var tag = column.Tag?.ToString();
+
+        var sortAsc = new MenuFlyoutItem { Text = "Sort ascending" };
+        sortAsc.Click += (_, _) => SortColumn(column, CommunityToolkit.WinUI.UI.Controls.DataGridSortDirection.Ascending);
+        menu.Items.Add(sortAsc);
+
+        var sortDesc = new MenuFlyoutItem { Text = "Sort descending" };
+        sortDesc.Click += (_, _) => SortColumn(column, CommunityToolkit.WinUI.UI.Controls.DataGridSortDirection.Descending);
+        menu.Items.Add(sortDesc);
+
+        menu.Items.Add(new MenuFlyoutSeparator());
+
+        var hide = new MenuFlyoutItem { Text = "Hide this column" };
+        hide.Click += (_, _) =>
+        {
+            column.Visibility = Visibility.Collapsed;
+            SaveColumnVisibility();
+        };
+        menu.Items.Add(hide);
+
+        // "Filter by this column" — inline submenu for category-style filters
+        // (each value as a ToggleMenuFlyoutItem). For Message we fall back to
+        // scrolling the side panel + briefly highlighting the section, since
+        // text input doesn't fit cleanly inside a MenuFlyout.
+        var inlineSubmenu = BuildInlineFilterSubmenu(tag, out var fallbackSection);
+        if (inlineSubmenu != null)
+        {
+            menu.Items.Add(new MenuFlyoutSeparator());
+            menu.Items.Add(inlineSubmenu);
+        }
+        else if (fallbackSection != null)
+        {
+            menu.Items.Add(new MenuFlyoutSeparator());
+            var filter = new MenuFlyoutItem { Text = $"Filter by {column.Header}" };
+            filter.Icon = new SymbolIcon(Symbol.Filter);
+            var section = fallbackSection;
+            filter.Click += (_, _) =>
+            {
+                RevealFilterSection(section);
+                HighlightFilterSection(section);
+            };
+            menu.Items.Add(filter);
+        }
+
+        return menu;
+    }
+
+    /// <summary>
+    /// For category-backed columns, returns a "Filter by …" submenu where
+    /// each option is a ToggleMenuFlyoutItem that flips IsSelected on the
+    /// matching SourceCategory / EventTypeItem (so the VM's regular change
+    /// pipeline kicks in, including single-select enforcement).
+    ///
+    /// For non-category columns (Message), returns null and sets
+    /// <paramref name="fallbackSectionName"/> to a side-panel section to
+    /// scroll to + highlight.
+    /// </summary>
+    private MenuFlyoutSubItem? BuildInlineFilterSubmenu(string? tag, out string? fallbackSectionName)
+    {
+        fallbackSectionName = null;
+        if (string.IsNullOrEmpty(tag)) return null;
+
+        switch (tag)
+        {
+            case "Source":   return BuildCategorySubmenu("Filter by Source",   ViewModel.SourceCategories);
+            case "Level":    return BuildLevelSubmenu();
+            case "Id":       return BuildCategorySubmenu("Filter by Event ID", ViewModel.IdCategories);
+            case "User":     return BuildCategorySubmenu("Filter by User",     ViewModel.UserCategories);
+            case "Channel":  return BuildCategorySubmenu("Filter by Channel",  ViewModel.ChannelCategories);
+            case "Time":     return BuildTimeSubmenu();
+            case "Message":  fallbackSectionName = "MessageFilterSection"; return null;
+            default:         return null;
+        }
+    }
+
+    private MenuFlyoutSubItem BuildCategorySubmenu(string label, IEnumerable<Models.SourceCategory> items)
+    {
+        var sub = new MenuFlyoutSubItem { Text = label };
+        sub.Icon = new SymbolIcon(Symbol.Filter);
+        foreach (var cat in items)
+        {
+            if (cat.IsAllSources) continue;
+            var toggle = new ToggleMenuFlyoutItem { Text = cat.Display, IsChecked = cat.IsSelected };
+            var captured = cat;
+            toggle.Click += (_, _) => captured.IsSelected = !captured.IsSelected;
+            sub.Items.Add(toggle);
+        }
+        if (sub.Items.Count == 0)
+        {
+            sub.Items.Add(new MenuFlyoutItem { Text = "(no values)", IsEnabled = false });
+        }
+        return sub;
+    }
+
+    private MenuFlyoutSubItem BuildLevelSubmenu()
+    {
+        var sub = new MenuFlyoutSubItem { Text = "Filter by Level" };
+        sub.Icon = new SymbolIcon(Symbol.Filter);
+        foreach (var t in ViewModel.AvailableTypes)
+        {
+            if (t.Level == null) continue; // skip "All Levels"
+            var toggle = new ToggleMenuFlyoutItem { Text = t.Name, IsChecked = t.IsSelected };
+            var captured = t;
+            toggle.Click += (_, _) => captured.IsSelected = !captured.IsSelected;
+            sub.Items.Add(toggle);
+        }
+        return sub;
+    }
+
+    private MenuFlyoutSubItem BuildTimeSubmenu()
+    {
+        var sub = new MenuFlyoutSubItem { Text = "Filter by Time" };
+        sub.Icon = new SymbolIcon(Symbol.Filter);
+        foreach (var window in ViewModel.LoadWindows)
+        {
+            var toggle = new ToggleMenuFlyoutItem
+            {
+                Text = window.Name,
+                IsChecked = ReferenceEquals(window, ViewModel.SelectedLoadWindow)
+            };
+            var captured = window;
+            toggle.Click += (_, _) => ViewModel.SelectedLoadWindow = captured;
+            sub.Items.Add(toggle);
+        }
+        return sub;
+    }
+
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _highlightTimer;
+    private FrameworkElement? _highlightTarget;
+    private Brush? _highlightOriginalBg;
+
+    /// <summary>
+    /// Temporarily paint a filter section's background with the accent color
+    /// so the user can find where their click landed. Restored after ~2s, or
+    /// when another section is highlighted.
+    /// </summary>
+    private void HighlightFilterSection(string sectionName)
+    {
+        // Restore any prior highlight first.
+        if (_highlightTarget != null)
+        {
+            (_highlightTarget as Control)?.SetValue(Control.BackgroundProperty, _highlightOriginalBg!);
+            if (_highlightTarget is Panel panel) panel.Background = _highlightOriginalBg;
+            _highlightTimer?.Stop();
+        }
+
+        if (FindName(sectionName) is not Panel target) return;
+        _highlightTarget = target;
+        _highlightOriginalBg = target.Background;
+        target.Background = (Brush)Application.Current.Resources["AccentFillColorTertiaryBrush"];
+
+        _highlightTimer = DispatcherQueue.CreateTimer();
+        _highlightTimer.Interval = TimeSpan.FromSeconds(2);
+        _highlightTimer.Tick += (s, e) =>
+        {
+            if (_highlightTarget is Panel p) p.Background = _highlightOriginalBg;
+            _highlightTarget = null;
+            _highlightOriginalBg = null;
+            _highlightTimer?.Stop();
+        };
+        _highlightTimer.Start();
+    }
+
+    private void SortColumn(DataGridColumn column, CommunityToolkit.WinUI.UI.Controls.DataGridSortDirection direction)
+    {
+        ApplySortByColumn(column, direction);
+    }
+
+    private void ApplySortByColumn(DataGridColumn column, DataGridSortDirection direction)
+    {
+        foreach (var col in EventsDataGrid.Columns)
+        {
+            col.SortDirection = ReferenceEquals(col, column) ? direction : null;
+        }
+
+        var tag = column.Tag?.ToString() ?? "Time";
+        Func<EventLogEntry, object> keySelector = tag switch
+        {
+            "Time"    => entry => entry.TimeCreated,
+            "Level"   => entry => (int)entry.Level,
+            "Id"      => entry => entry.Id,
+            "Source"  => entry => entry.ProviderName,
+            "Channel" => entry => entry.Channel,
+            "User"    => entry => entry.Username,
+            "Message" => entry => entry.Message,
+            _         => entry => entry.TimeCreated
+        };
+
+        var sorted = direction == DataGridSortDirection.Ascending
+            ? ViewModel.FilteredEvents.OrderBy(keySelector).ToList()
+            : ViewModel.FilteredEvents.OrderByDescending(keySelector).ToList();
+
+        ViewModel.FilteredEvents.Clear();
+        foreach (var entry in sorted)
+        {
+            ViewModel.FilteredEvents.Add(entry);
+        }
+    }
+
+    private void RevealFilterSection(string sectionName)
+    {
+        // If the filter panel is collapsed, expand it first.
+        if (FilterPanel.Visibility == Visibility.Collapsed)
+        {
+            ExpandFilters_Click(this, new RoutedEventArgs());
+        }
+
+        var target = FindName(sectionName) as FrameworkElement;
+        target?.StartBringIntoView(new BringIntoViewOptions
+        {
+            AnimationDesired = true,
+            VerticalAlignmentRatio = 0.0
+        });
     }
 
     private void CopyCell_Click(object sender, RoutedEventArgs e)
@@ -261,24 +545,52 @@ public sealed partial class MainPage : Page
         SetClipboard(EventExporter.Serialize(entries, EventExporter.Format.Xml));
     }
 
+    protected override async void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+        // Settings panel may have changed the color scheme while this page
+        // wasn't in the visual tree — ThemeChanged fired but FindVisualChildren
+        // returned nothing because the DataGrid wasn't realized yet.
+        // Delay so the visual tree (including realized DataGridRow containers)
+        // has time to lay out, then re-apply tints to every visible row.
+        await System.Threading.Tasks.Task.Delay(150);
+        OnThemeChanged();
+    }
+
     private void OnThemeChanged()
     {
-        // Walk visible DataGridRow instances in the visual tree and refresh
-        // each row's Background directly. This avoids rebuilding the entire
-        // FilteredEvents ObservableCollection, which froze the UI for several
-        // seconds with 50k+ events because every Add raised a CollectionChanged
-        // that the DataGrid had to react to. Unrealized rows are re-themed by
-        // EventsDataGrid_LoadingRow when they scroll into view.
         DispatcherQueue.TryEnqueue(() =>
         {
             try
             {
-                foreach (var row in FindVisualChildren<CommunityToolkit.WinUI.UI.Controls.DataGridRow>(EventsDataGrid))
+                // 1) Poke INPC on every entry so badge bindings re-evaluate
+                //    through their converters — the underlying Level value
+                //    didn't change, but its computed brush did.
+                foreach (var entry in ViewModel.FilteredEvents)
                 {
-                    if (row.DataContext is EventLogEntry entry)
+                    entry.RaisePropertyChanged(nameof(EventLogEntry.Level));
+                }
+
+                // 2) Force the DataGrid to re-realize every row so LoadingRow
+                //    fires again and re-paints Background with the current
+                //    scheme. Walking the visual tree from FindVisualChildren
+                //    and setting row.Background directly proved unreliable —
+                //    rows are virtualized and the imperative assignment didn't
+                //    survive the DataGrid's recycling, leaving previously-
+                //    visible rows showing the stale tint.
+                //
+                //    Swap ItemsSource to null and back to force a full reload.
+                //    We preserve the selection and try to keep scroll roughly
+                //    where it was by re-selecting the same item.
+                if (EventsDataGrid.ItemsSource is { } items)
+                {
+                    var selected = EventsDataGrid.SelectedItem;
+                    EventsDataGrid.ItemsSource = null;
+                    EventsDataGrid.ItemsSource = items;
+                    if (selected != null)
                     {
-                        var brush = _rowBrushConverter.Convert(entry.Level, typeof(Brush), null, "") as Brush;
-                        row.Background = brush ?? _transparentBrush;
+                        EventsDataGrid.SelectedItem = selected;
+                        EventsDataGrid.ScrollIntoView(selected, null);
                     }
                 }
             }
@@ -473,44 +785,46 @@ public sealed partial class MainPage : Page
         var newDirection = current == DataGridSortDirection.Ascending
             ? DataGridSortDirection.Descending
             : DataGridSortDirection.Ascending;
-
-        foreach (var col in EventsDataGrid.Columns)
-        {
-            if (col != e.Column) col.SortDirection = null;
-        }
-        e.Column.SortDirection = newDirection;
-
-        var tag = e.Column.Tag?.ToString() ?? "Time";
-        Func<EventLogEntry, object> keySelector = tag switch
-        {
-            "Time" => entry => entry.TimeCreated,
-            "Level" => entry => (int)entry.Level,
-            "Id" => entry => entry.Id,
-            "Source" => entry => entry.ProviderName,
-            "Channel" => entry => entry.Channel,
-            "User" => entry => entry.Username,
-            "Message" => entry => entry.Message,
-            _ => entry => entry.TimeCreated
-        };
-
-        var sorted = newDirection == DataGridSortDirection.Ascending
-            ? ViewModel.FilteredEvents.OrderBy(keySelector).ToList()
-            : ViewModel.FilteredEvents.OrderByDescending(keySelector).ToList();
-
-        ViewModel.FilteredEvents.Clear();
-        foreach (var entry in sorted)
-        {
-            ViewModel.FilteredEvents.Add(entry);
-        }
+        ApplySortByColumn(e.Column, newDirection);
     }
+
+    // Track INPC subscriptions per realized DataGridRow so we can unhook when
+    // the row's DataContext switches (virtualization recycles row containers).
+    private readonly Dictionary<CommunityToolkit.WinUI.UI.Controls.DataGridRow,
+        (EventLogEntry entry, System.ComponentModel.PropertyChangedEventHandler handler)> _rowSubscriptions = new();
 
     private void EventsDataGrid_LoadingRow(object? sender, DataGridRowEventArgs e)
     {
-        if (e.Row.DataContext is EventLogEntry entry)
+        if (e.Row.DataContext is not EventLogEntry entry) return;
+
+        // Unhook from whatever entry this row was last bound to (recycling).
+        if (_rowSubscriptions.TryGetValue(e.Row, out var prev))
         {
-            var brush = _rowBrushConverter.Convert(entry.Level, typeof(Brush), null, "") as Brush;
-            e.Row.Background = brush ?? _transparentBrush;
+            prev.entry.PropertyChanged -= prev.handler;
         }
+
+        // Subscribe to this entry: when its Level INPC fires (we raise it
+        // ourselves on theme change), repaint this specific row's Background.
+        // Captures `row` and `entry` in the closure; cleaned up on recycle.
+        var row = e.Row;
+        var capturedEntry = entry;
+        System.ComponentModel.PropertyChangedEventHandler handler = (_, ev) =>
+        {
+            if (ev.PropertyName == nameof(EventLogEntry.Level))
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    var b = _rowBrushConverter.Convert(capturedEntry.Level, typeof(Brush), null, "") as Brush;
+                    row.Background = b ?? _transparentBrush;
+                });
+            }
+        };
+        entry.PropertyChanged += handler;
+        _rowSubscriptions[row] = (entry, handler);
+
+        // Initial paint.
+        var brush = _rowBrushConverter.Convert(entry.Level, typeof(Brush), null, "") as Brush;
+        e.Row.Background = brush ?? _transparentBrush;
     }
 
     private IEnumerable<EventLogEntry> GetSelectedEntries()

@@ -2,6 +2,35 @@
 
 All notable changes to Simple Event Viewer are documented here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] — 2026-05-15
+
+Quality-of-life pass on Settings, filters, and discoverability.
+
+### Added
+- **Event ID** is now a first-class filter alongside Source / Level / User / Process / Computer / Channel. Multi-select on by default; sorts numerically.
+- **Right-click a column header** for a context menu: Sort ascending / descending, Hide this column, and an inline "Filter by …" submenu that exposes the checklist (or presets, for Time) directly without scrolling to the side panel. For Message, the menu instead scrolls + briefly highlights the side-panel section.
+- **Ctrl+F quick find**. Floating find bar in the toolbar row searches Message + Source + Level case-insensitively, layered on top of any active filters. Escape closes.
+- **Visible filter sections** — Settings → Filter panel → checkbox per filter section so the side panel can be trimmed (e.g. hide Computer if you never use it). All on by default.
+- **Visible detail fields** — Settings → Event details pane → checkbox per detail-row field (Event ID, Level, Time Created, Provider, Provider GUID, Channel, Task, Keywords, User, Process / Thread, Computer, Message, XML view). All on by default.
+- **More color schemes** — added Teal, Cyan, Lime, Amber, Crimson, Pink, Magenta, Indigo, Slate, Brown, plus a separator and 9 **themed palettes**: Pastel, Vibrant, Cyberpunk, Forest, Ocean, Sunset, Earth, Royal, Mono. Each scheme uses four genuinely distinct hues per level (Critical, Error, Warning, Info) instead of shades of one color.
+- **Color preview swatches** moved directly under the Color Scheme dropdown so the effect of a pick is visible without scrolling.
+- **Settings is reorganized** into Theme & Colors / Window / Events grid / Event details pane / Filter panel cards instead of one wall of options. Above-the-fold full-width title bar with a clearly labeled **Back** button (always visible, doesn't scroll), and a **left-pane NavigationView** to jump between cards.
+
+### Changed
+- **Refresh button label is contextual**: reads "Refresh live logs" or "Reload sample.evtx" depending on what's loaded. Refresh re-reads the current source instead of always switching to live.
+- **Start-menu display name** is now "Simple Event Viewer" (with a space) instead of "SimpleEventViewer".
+- Default `RowColorMode` flipped to **FullRow** so first-launch rows show their level tint.
+
+### Fixed
+- **Row tint not refreshing on color scheme change.** Previously, the visible rows kept their old tint until the user scrolled them out and back in. `OnThemeChanged` now toggles `EventsDataGrid.ItemsSource` to null and back to force every row to re-realize through `LoadingRow` with the current scheme. Selection is preserved. A `RowTintRefreshesWhenColorSchemeChanges` UI smoke test pixel-samples the grid before / after a scheme switch to lock in the fix.
+
+### Tests
+- UI smoke suite grew from 7 to 16 tests covering: Open menu items, status bar source label, title-bar source label, contextual Refresh label, Ctrl+F find bar, Settings round-trip + nav-bar item presence, Message search narrowing the grid, Clear All Filters reachability, and the row-tint regression test above.
+- `App_FilterPanelHasExpectedSections` now unhides any filter sections that were toggled off in persisted Settings before asserting their labels exist.
+
+### MCP server
+- Server `version` bumped to `1.2.0`. No protocol changes.
+
 ## [1.1.0] — 2026-05-12
 
 Focused on filtering, persistence, and getting the data out. Quality-of-life pass across the whole filter panel plus a handful of UX fixes.

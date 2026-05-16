@@ -29,6 +29,9 @@ public class FilterSnapshot
     [JsonPropertyName("channels")]
     public List<string> Channels { get; set; } = new();
 
+    [JsonPropertyName("ids")]
+    public List<string> Ids { get; set; } = new();
+
     /// <summary>Stored as level names: Critical / Error / Warning / Information / Verbose.</summary>
     [JsonPropertyName("levels")]
     public List<string> Levels { get; set; } = new();

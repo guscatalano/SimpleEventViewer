@@ -4,7 +4,7 @@ A modern Windows Event Log viewer built with **WinUI 3** and the Windows App SDK
 
 ![Screenshot](docs/screenshot.png)
 
-> Current release: **v1.1.0** — see [CHANGELOG.md](CHANGELOG.md).
+> Current release: **v1.2.0** — see [CHANGELOG.md](CHANGELOG.md).
 
 ## Features
 
@@ -118,7 +118,7 @@ Quick sanity check from a shell:
 
 ```pwsh
 curl http://127.0.0.1:7321/
-# {"server":"SimpleEventViewer","version":"1.1.0",...}
+# {"server":"SimpleEventViewer","version":"1.2.0",...}
 
 curl -X POST http://127.0.0.1:7321/ -H "Content-Type: application/json" `
      -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
@@ -197,6 +197,18 @@ dotnet publish -c Release -p:Platform=x64 -r win-x64 --self-contained true -o pu
 Both are uploaded as workflow artifacts. Pushing a `v*` tag also creates a GitHub Release with both installers attached.
 
 Trimming and ReadyToRun are explicitly disabled during the MSIX build (`PublishTrimmed=false`, `PublishReadyToRun=false`) because they require self-contained publishing. The MSIX uses framework-dependent deployment via the Windows App SDK runtime.
+
+## How this was built
+
+Almost entirely vibe-coded with [Claude Code](https://www.anthropic.com/claude-code). Cumulative session stats at the time of v1.1.0:
+
+```
+┌───────────────────┬───────┬───────────┬─────────────┬───────────────┬───────────────────┬───────────────┐
+│      Project      │ Reqs  │   Local   │   Remote    │ Prompt tokens │ Completion tokens │ Upstream time │
+├───────────────────┼───────┼───────────┼─────────────┼───────────────┼───────────────────┼───────────────┤
+│ SimpleEventViewer │ 1,501 │ 200 (13%) │ 1,301 (87%) │         691 M │             962 K │       28.9 hr │
+└───────────────────┴───────┴───────────┴─────────────┴───────────────┴───────────────────┴───────────────┘
+```
 
 ## License & credits
 

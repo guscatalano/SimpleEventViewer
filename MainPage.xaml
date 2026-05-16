@@ -12,6 +12,10 @@
     mc:Ignorable="d"
     NavigationCacheMode="Required">
 
+    <Page.KeyboardAccelerators>
+        <KeyboardAccelerator Modifiers="Control" Key="F" Invoked="FindAccelerator_Invoked" />
+    </Page.KeyboardAccelerators>
+
     <Grid Padding="12" RowSpacing="8">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -64,7 +68,31 @@
                               Click="RefreshButton_Click"
                               ToolTipService.ToolTip="Re-read the current source (live or file) and re-apply the active filters" />
             </CommandBar>
-            <Button Grid.Column="1" Click="SettingsButton_Click" Padding="8" VerticalAlignment="Center" Margin="0,0,8,0"
+            <!-- Ctrl+F find bar — vertically aligned with the toolbar so it
+                 doesn't overlap the events grid. Right-edge of the same row
+                 as the Open / Refresh / Settings controls. -->
+            <Border x:Name="FindBar" Grid.Column="0" Visibility="Collapsed"
+                    HorizontalAlignment="Right" VerticalAlignment="Center"
+                    Margin="0,0,8,0" Padding="8,4"
+                    Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                    BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="6">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon Glyph="&#xE721;" FontSize="13" VerticalAlignment="Center" Opacity="0.7" />
+                    <TextBox x:Name="FindBox" Width="260"
+                             PlaceholderText="Find in message, source, level…"
+                             Text="{x:Bind ViewModel.QuickFindText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             KeyDown="FindBox_KeyDown" />
+                    <Button Click="CloseFindBar_Click" Padding="6"
+                            Background="Transparent" BorderThickness="0"
+                            ToolTipService.ToolTip="Close (Esc)">
+                        <FontIcon Glyph="&#xE711;" FontSize="11" />
+                    </Button>
+                </StackPanel>
+            </Border>
+            <Button Grid.Column="1" x:Name="SettingsButton"
+                    Click="SettingsButton_Click" Padding="8" VerticalAlignment="Center" Margin="0,0,8,0"
+                    AutomationProperties.Name="Settings"
                     ToolTipService.ToolTip="Settings">
                 <FontIcon Glyph="&#xE713;" FontSize="16" />
             </Button>
@@ -110,7 +138,8 @@
                     </Grid>
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
                         <StackPanel Padding="16,4,16,16" Spacing="16">
-                            <StackPanel Spacing="6">
+                            <StackPanel x:Name="SourceFilterSection" Spacing="6"
+                                        Visibility="{x:Bind ViewModel.SourceSectionVisibility, Mode=OneWay}">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <Border Width="3" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2"
                                             Visibility="{x:Bind ViewModel.IsSourceFilterActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
@@ -147,7 +176,8 @@
                                 </DropDownButton>
                             </StackPanel>
 
-                            <StackPanel Spacing="6">
+                            <StackPanel x:Name="TimeFilterSection" Spacing="6"
+                                        Visibility="{x:Bind ViewModel.TimeSectionVisibility, Mode=OneWay}">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <Border Width="3" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2"
                                             Visibility="{x:Bind ViewModel.IsTimeFilterActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
@@ -180,7 +210,8 @@
                                 </StackPanel>
                             </StackPanel>
 
-                            <StackPanel Spacing="6">
+                            <StackPanel x:Name="LevelFilterSection" Spacing="6"
+                                        Visibility="{x:Bind ViewModel.LevelSectionVisibility, Mode=OneWay}">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <Border Width="3" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2"
                                             Visibility="{x:Bind ViewModel.IsLevelFilterActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
@@ -217,7 +248,46 @@
                                 </DropDownButton>
                             </StackPanel>
 
-                            <StackPanel Spacing="6">
+                            <StackPanel x:Name="IdFilterSection" Spacing="6"
+                                        Visibility="{x:Bind ViewModel.IdSectionVisibility, Mode=OneWay}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Border Width="3" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2"
+                                            Visibility="{x:Bind ViewModel.IsIdFilterActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                    <TextBlock Text="Event ID" FontWeight="SemiBold" FontSize="13" />
+                                </StackPanel>
+                                <ComboBox ItemsSource="{x:Bind ViewModel.IdCategories, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedId, Mode=TwoWay}"
+                                          DisplayMemberPath="Display"
+                                          HorizontalAlignment="Stretch"
+                                          Visibility="{x:Bind ViewModel.IdComboBoxVisibility, Mode=OneWay}" />
+                                <DropDownButton Content="{x:Bind ViewModel.IdFilterSummary, Mode=OneWay}"
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                Visibility="{x:Bind ViewModel.IdDropDownVisibility, Mode=OneWay}">
+                                    <DropDownButton.Flyout>
+                                        <Flyout Placement="Bottom">
+                                            <ListView ItemsSource="{x:Bind ViewModel.IdCategories, Mode=OneWay}"
+                                                      SelectionMode="None" IsItemClickEnabled="False"
+                                                      MinWidth="220" MaxHeight="400">
+                                                <ListView.ItemContainerStyle>
+                                                    <Style TargetType="ListViewItem">
+                                                        <Setter Property="Visibility" Value="{Binding IsListRow, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                    </Style>
+                                                </ListView.ItemContainerStyle>
+                                                <ListView.ItemTemplate>
+                                                    <DataTemplate x:DataType="models:SourceCategory">
+                                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                                  Content="{x:Bind Display}"
+                                                                  MinWidth="180" />
+                                                    </DataTemplate>
+                                                </ListView.ItemTemplate>
+                                            </ListView>
+                                        </Flyout>
+                                    </DropDownButton.Flyout>
+                                </DropDownButton>
+                            </StackPanel>
+
+                            <StackPanel x:Name="MessageFilterSection" Spacing="6"
+                                        Visibility="{x:Bind ViewModel.MessageSectionVisibility, Mode=OneWay}">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <Border Width="3" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2"
                                             Visibility="{x:Bind ViewModel.IsMessageFilterActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
@@ -227,7 +297,8 @@
                                          Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
 
-                            <StackPanel Spacing="6">
+                            <StackPanel x:Name="UserFilterSection" Spacing="6"
+                                        Visibility="{x:Bind ViewModel.UserSectionVisibility, Mode=OneWay}">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <Border Width="3" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2"
                                             Visibility="{x:Bind ViewModel.IsUserFilterActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
@@ -264,7 +335,8 @@
                                 </DropDownButton>
                             </StackPanel>
 
-                            <StackPanel Spacing="6">
+                            <StackPanel x:Name="ProcessFilterSection" Spacing="6"
+                                        Visibility="{x:Bind ViewModel.ProcessSectionVisibility, Mode=OneWay}">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <Border Width="3" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2"
                                             Visibility="{x:Bind ViewModel.IsProcessFilterActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
@@ -301,7 +373,8 @@
                                 </DropDownButton>
                             </StackPanel>
 
-                            <StackPanel Spacing="6">
+                            <StackPanel x:Name="ComputerFilterSection" Spacing="6"
+                                        Visibility="{x:Bind ViewModel.ComputerSectionVisibility, Mode=OneWay}">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <Border Width="3" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2"
                                             Visibility="{x:Bind ViewModel.IsComputerFilterActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
@@ -338,7 +411,8 @@
                                 </DropDownButton>
                             </StackPanel>
 
-                            <StackPanel Spacing="6">
+                            <StackPanel x:Name="ChannelFilterSection" Spacing="6"
+                                        Visibility="{x:Bind ViewModel.ChannelSectionVisibility, Mode=OneWay}">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <Border Width="3" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2"
                                             Visibility="{x:Bind ViewModel.IsChannelFilterActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
@@ -455,23 +529,31 @@
                                           HeadersVisibility="Column"
                                           SelectionMode="Extended"
                                           IsReadOnly="True"
-                                          RowBackground="Transparent"
                                           RightTapped="EventsDataGrid_RightTapped"
                                           Sorting="EventsDataGrid_Sorting"
                                           LoadingRow="EventsDataGrid_LoadingRow">
+                            <tkcontrols:DataGrid.RowStyle>
+                                <Style TargetType="tkcontrols:DataGridRow">
+                                    <!-- Row tint is data-driven via Level + the row brush converter
+                                         (which reads the current Color Scheme + Row Color Mode).
+                                         INPC on Level forces re-evaluation when the scheme changes. -->
+                                    <Setter Property="Background"
+                                            Value="{Binding Level, Converter={StaticResource LevelToRowBrushConverter}}" />
+                                </Style>
+                            </tkcontrols:DataGrid.RowStyle>
                         <tkcontrols:DataGrid.Columns>
                             <tkcontrols:DataGridTextColumn Header="Time" Tag="Time" Binding="{Binding TimeCreatedDisplay}" Width="160" />
                             <tkcontrols:DataGridTemplateColumn Header="Level" Tag="Level" Width="100">
                                 <tkcontrols:DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <Border Background="{Binding Level, Converter={StaticResource LevelToBrushConverter}}"
+                                    <DataTemplate x:DataType="models:EventLogEntry">
+                                        <Border Background="{x:Bind Level, Mode=OneWay, Converter={StaticResource LevelToBrushConverter}}"
                                                 CornerRadius="3"
                                                 HorizontalAlignment="Left"
                                                 VerticalAlignment="Center"
                                                 Padding="8,2"
                                                 Margin="6,0">
-                                            <TextBlock Text="{Binding LevelName}"
-                                                       Foreground="{Binding Level, Converter={StaticResource LevelToTextBrushConverter}}"
+                                            <TextBlock Text="{x:Bind LevelName, Mode=OneWay}"
+                                                       Foreground="{x:Bind Level, Mode=OneWay, Converter={StaticResource LevelToTextBrushConverter}}"
                                                        FontSize="11"
                                                        FontWeight="SemiBold" />
                                         </Border>
@@ -537,7 +619,7 @@
                             <StackPanel Padding="16,4,16,16" Spacing="8">
                             <Grid Visibility="{x:Bind ViewModel.SelectedEvent, Mode=OneWay, Converter={StaticResource NullToVisibilityConverter}}">
                                 <StackPanel Spacing="6">
-                                    <Grid ColumnSpacing="6">
+                                    <Grid ColumnSpacing="6" Visibility="{x:Bind ViewModel.DetailIdVisibility, Mode=OneWay}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="120" />
@@ -551,7 +633,7 @@
                                             <FontIcon Glyph="&#xE8C8;" FontSize="11" />
                                         </Button>
                                     </Grid>
-                                    <Grid ColumnSpacing="6">
+                                    <Grid ColumnSpacing="6" Visibility="{x:Bind ViewModel.DetailLevelVisibility, Mode=OneWay}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="120" />
@@ -565,7 +647,7 @@
                                             <FontIcon Glyph="&#xE8C8;" FontSize="11" />
                                         </Button>
                                     </Grid>
-                                    <Grid ColumnSpacing="6">
+                                    <Grid ColumnSpacing="6" Visibility="{x:Bind ViewModel.DetailTimeVisibility, Mode=OneWay}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="120" />
@@ -579,7 +661,7 @@
                                             <FontIcon Glyph="&#xE8C8;" FontSize="11" />
                                         </Button>
                                     </Grid>
-                                    <Grid ColumnSpacing="6">
+                                    <Grid ColumnSpacing="6" Visibility="{x:Bind ViewModel.DetailProviderVisibility, Mode=OneWay}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="120" />
@@ -593,7 +675,7 @@
                                             <FontIcon Glyph="&#xE8C8;" FontSize="11" />
                                         </Button>
                                     </Grid>
-                                    <Grid ColumnSpacing="6">
+                                    <Grid ColumnSpacing="6" Visibility="{x:Bind ViewModel.DetailProviderGuidVisibility, Mode=OneWay}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="120" />
@@ -607,7 +689,7 @@
                                             <FontIcon Glyph="&#xE8C8;" FontSize="11" />
                                         </Button>
                                     </Grid>
-                                    <Grid ColumnSpacing="6">
+                                    <Grid ColumnSpacing="6" Visibility="{x:Bind ViewModel.DetailChannelVisibility, Mode=OneWay}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="120" />
@@ -621,7 +703,7 @@
                                         <TextBlock Grid.Column="1" Text="Channel:" FontWeight="SemiBold" />
                                         <TextBlock Grid.Column="2" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedEvent.Channel, Mode=OneWay}" />
                                     </Grid>
-                                    <Grid ColumnSpacing="6">
+                                    <Grid ColumnSpacing="6" Visibility="{x:Bind ViewModel.DetailTaskVisibility, Mode=OneWay}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="120" />
@@ -635,7 +717,7 @@
                                             <FontIcon Glyph="&#xE8C8;" FontSize="11" />
                                         </Button>
                                     </Grid>
-                                    <Grid ColumnSpacing="6">
+                                    <Grid ColumnSpacing="6" Visibility="{x:Bind ViewModel.DetailKeywordsVisibility, Mode=OneWay}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="120" />
@@ -649,7 +731,7 @@
                                             <FontIcon Glyph="&#xE8C8;" FontSize="11" />
                                         </Button>
                                     </Grid>
-                                    <Grid ColumnSpacing="6">
+                                    <Grid ColumnSpacing="6" Visibility="{x:Bind ViewModel.DetailUserVisibility, Mode=OneWay}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="120" />
@@ -663,7 +745,7 @@
                                             <FontIcon Glyph="&#xE8C8;" FontSize="11" />
                                         </Button>
                                     </Grid>
-                                    <Grid ColumnSpacing="6">
+                                    <Grid ColumnSpacing="6" Visibility="{x:Bind ViewModel.DetailProcessThreadVisibility, Mode=OneWay}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="120" />
@@ -680,7 +762,7 @@
                                             <TextBlock Text="{x:Bind ViewModel.SelectedEvent.ThreadId, Mode=OneWay}" IsTextSelectionEnabled="True" />
                                         </StackPanel>
                                     </Grid>
-                                    <Grid ColumnSpacing="6">
+                                    <Grid ColumnSpacing="6" Visibility="{x:Bind ViewModel.DetailComputerVisibility, Mode=OneWay}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="120" />
@@ -694,7 +776,8 @@
                                             <FontIcon Glyph="&#xE8C8;" FontSize="11" />
                                         </Button>
                                     </Grid>
-                                    <StackPanel Spacing="6" Margin="0,4,0,0">
+                                    <StackPanel Spacing="6" Margin="0,4,0,0"
+                                                Visibility="{x:Bind ViewModel.DetailMessageVisibility, Mode=OneWay}">
                                         <StackPanel Orientation="Horizontal" Spacing="6">
                                             <Button Click="CopyDetailField_Click" Padding="4" Background="Transparent" BorderThickness="0"
                                                     ToolTipService.ToolTip="Copy"
@@ -705,7 +788,8 @@
                                         </StackPanel>
                                         <TextBlock Text="{x:Bind ViewModel.SelectedEvent.Message, Mode=OneWay}" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
                                     </StackPanel>
-                                    <Expander Header="XML View" HorizontalAlignment="Stretch" Margin="0,8,0,0">
+                                    <Expander Header="XML View" HorizontalAlignment="Stretch" Margin="0,8,0,0"
+                                              Visibility="{x:Bind ViewModel.DetailXmlVisibility, Mode=OneWay}">
                                         <TextBox Text="{x:Bind ViewModel.SelectedEvent.Xml, Mode=OneWay}"
                                                  IsReadOnly="True"
                                                  TextWrapping="Wrap"

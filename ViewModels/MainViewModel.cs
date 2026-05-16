@@ -29,12 +29,14 @@ public partial class MainViewModel : ObservableObject
     private TimeSpan _startTimeOfDay = TimeSpan.Zero;
     private TimeSpan _endTimeOfDay = new TimeSpan(23, 59, 59);
     private string _searchText = string.Empty;
+    private string _quickFindText = string.Empty;
     private EventLogEntry? _selectedEvent;
     private ObservableCollection<SourceCategory> _sourceCategories = new();
     private ObservableCollection<SourceCategory> _processCategories = new();
     private ObservableCollection<SourceCategory> _userCategories = new();
     private ObservableCollection<SourceCategory> _computerCategories = new();
     private ObservableCollection<SourceCategory> _channelCategories = new();
+    private ObservableCollection<SourceCategory> _idCategories = new();
     private ObservableCollection<EventLogEntry> _filteredEvents = new();
     private int _totalEventCount = -1;
     private bool _isStreaming = false;
@@ -70,6 +72,8 @@ public partial class MainViewModel : ObservableObject
         _selectedType = AvailableTypes[0]; // "All Levels"
 
         SettingsService.Instance.MultiSelectChanged += OnMultiSelectChanged;
+        SettingsService.Instance.FilterVisibilityChanged += OnFilterVisibilityChanged;
+        SettingsService.Instance.DetailFieldVisibilityChanged += OnDetailFieldVisibilityChanged;
 
         LoadWindows = new List<LoadWindowItem>
         {
@@ -219,6 +223,18 @@ public partial class MainViewModel : ObservableObject
     {
         get => _channelCategories;
         set => SetProperty(ref _channelCategories, value);
+    }
+
+    public ObservableCollection<SourceCategory> IdCategories
+    {
+        get => _idCategories;
+        set => SetProperty(ref _idCategories, value);
+    }
+
+    public SourceCategory? SelectedId
+    {
+        get => CurrentSingleSelection(IdCategories);
+        set => SetSingleSelection(IdCategories, value, SettingsService.FilterDimension.Id, nameof(SelectedId));
     }
 
     public SourceCategory? SelectedChannel
@@ -448,6 +464,23 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Ctrl+F quick-find. Substring match across message, source, and level
+    /// in addition to whatever filters are already active. Cleared when the
+    /// find bar closes.
+    /// </summary>
+    public string QuickFindText
+    {
+        get => _quickFindText;
+        set
+        {
+            if (SetProperty(ref _quickFindText, value))
+            {
+                ApplyFilters();
+            }
+        }
+    }
+
     public EventLogEntry? SelectedEvent
     {
         get => _selectedEvent;
@@ -526,6 +559,7 @@ public partial class MainViewModel : ObservableObject
         ClearCategoryList(UserCategories);
         ClearCategoryList(ComputerCategories);
         ClearCategoryList(ChannelCategories);
+        ClearCategoryList(IdCategories);
 
         CurrentSource = "Live system logs";
         _totalEventCount = -1;
@@ -627,6 +661,7 @@ public partial class MainViewModel : ObservableObject
         var users     = SelectedUserNames();
         var computers = SelectedComputerNames();
         var channels  = SelectedChannelNames();
+        var ids       = SelectedIdNames();
         var levels    = SelectedLevelSet();
         var search    = SearchText;
 
@@ -638,31 +673,36 @@ public partial class MainViewModel : ObservableObject
         {
             try
             {
-                List<SourceCategory>? sourceOpts = null, processOpts = null, userOpts = null, compOpts = null, chanOpts = null;
+                List<SourceCategory>? sourceOpts = null, processOpts = null, userOpts = null, compOpts = null, chanOpts = null, idOpts = null;
 
                 if (skipDim != SettingsService.FilterDimension.Source)
                 {
-                    sourceOpts = AggregateOptions(EventFilter.Apply(master, null, levels, startTime, endTime, users, search, processes, computers, channels), e => string.IsNullOrEmpty(e.ProviderName) ? null : e.ProviderName, numericSort: false, token);
+                    sourceOpts = AggregateOptions(EventFilter.Apply(master, null, levels, startTime, endTime, users, search, processes, computers, channels, ids), e => string.IsNullOrEmpty(e.ProviderName) ? null : e.ProviderName, numericSort: false, token);
                     if (token.IsCancellationRequested) return;
                 }
                 if (skipDim != SettingsService.FilterDimension.Process)
                 {
-                    processOpts = AggregateOptions(EventFilter.Apply(master, sources, levels, startTime, endTime, users, search, null, computers, channels), e => e.ProcessId > 0 ? e.ProcessId.ToString() : null, numericSort: true, token);
+                    processOpts = AggregateOptions(EventFilter.Apply(master, sources, levels, startTime, endTime, users, search, null, computers, channels, ids), e => e.ProcessId > 0 ? e.ProcessId.ToString() : null, numericSort: true, token);
                     if (token.IsCancellationRequested) return;
                 }
                 if (skipDim != SettingsService.FilterDimension.User)
                 {
-                    userOpts = AggregateOptions(EventFilter.Apply(master, sources, levels, startTime, endTime, null, search, processes, computers, channels), e => string.IsNullOrEmpty(e.Username) ? null : e.Username, numericSort: false, token);
+                    userOpts = AggregateOptions(EventFilter.Apply(master, sources, levels, startTime, endTime, null, search, processes, computers, channels, ids), e => string.IsNullOrEmpty(e.Username) ? null : e.Username, numericSort: false, token);
                     if (token.IsCancellationRequested) return;
                 }
                 if (skipDim != SettingsService.FilterDimension.Computer)
                 {
-                    compOpts = AggregateOptions(EventFilter.Apply(master, sources, levels, startTime, endTime, users, search, processes, null, channels), e => string.IsNullOrEmpty(e.Computer) ? null : e.Computer, numericSort: false, token);
+                    compOpts = AggregateOptions(EventFilter.Apply(master, sources, levels, startTime, endTime, users, search, processes, null, channels, ids), e => string.IsNullOrEmpty(e.Computer) ? null : e.Computer, numericSort: false, token);
                     if (token.IsCancellationRequested) return;
                 }
                 if (skipDim != SettingsService.FilterDimension.Channel)
                 {
-                    chanOpts = AggregateOptions(EventFilter.Apply(master, sources, levels, startTime, endTime, users, search, processes, computers, null), e => string.IsNullOrEmpty(e.Channel) ? null : e.Channel, numericSort: false, token);
+                    chanOpts = AggregateOptions(EventFilter.Apply(master, sources, levels, startTime, endTime, users, search, processes, computers, null, ids), e => string.IsNullOrEmpty(e.Channel) ? null : e.Channel, numericSort: false, token);
+                    if (token.IsCancellationRequested) return;
+                }
+                if (skipDim != SettingsService.FilterDimension.Id)
+                {
+                    idOpts = AggregateOptions(EventFilter.Apply(master, sources, levels, startTime, endTime, users, search, processes, computers, channels, null), e => e.Id.ToString(), numericSort: true, token);
                     if (token.IsCancellationRequested) return;
                 }
 
@@ -677,6 +717,7 @@ public partial class MainViewModel : ObservableObject
                         if (userOpts    != null) ApplyOptions(UserCategories,     userOpts,    users,     "All Users");
                         if (compOpts    != null) ApplyOptions(ComputerCategories, compOpts,    computers, "All Computers");
                         if (chanOpts    != null) ApplyOptions(ChannelCategories,  chanOpts,    channels,  "All Channels");
+                        if (idOpts      != null) ApplyOptions(IdCategories,       idOpts,      ids,       "All IDs");
                     }
                     finally
                     {
@@ -768,6 +809,7 @@ public partial class MainViewModel : ObservableObject
             "All Users"     => nameof(SelectedUser),
             "All Computers" => nameof(SelectedComputer),
             "All Channels"  => nameof(SelectedChannel),
+            "All IDs"       => nameof(SelectedId),
             _ => string.Empty
         });
     }
@@ -789,6 +831,7 @@ public partial class MainViewModel : ObservableObject
     private HashSet<string> SelectedUserNames()     => SelectionFrom(UserCategories);
     private HashSet<string> SelectedComputerNames() => SelectionFrom(ComputerCategories);
     private HashSet<string> SelectedChannelNames()  => SelectionFrom(ChannelCategories);
+    private HashSet<string> SelectedIdNames()       => SelectionFrom(IdCategories);
 
     private HashSet<LogLevel> SelectedLevelSet()
     {
@@ -870,7 +913,44 @@ public partial class MainViewModel : ObservableObject
         if (UserCategories.Contains(cat))     return (UserCategories,     SettingsService.FilterDimension.User);
         if (ComputerCategories.Contains(cat)) return (ComputerCategories, SettingsService.FilterDimension.Computer);
         if (ChannelCategories.Contains(cat))  return (ChannelCategories,  SettingsService.FilterDimension.Channel);
+        if (IdCategories.Contains(cat))       return (IdCategories,       SettingsService.FilterDimension.Id);
         return (null, default);
+    }
+
+    private void OnFilterVisibilityChanged()
+    {
+        _dispatcherQueue.TryEnqueue(() =>
+        {
+            OnPropertyChanged(nameof(TimeSectionVisibility));
+            OnPropertyChanged(nameof(SourceSectionVisibility));
+            OnPropertyChanged(nameof(LevelSectionVisibility));
+            OnPropertyChanged(nameof(IdSectionVisibility));
+            OnPropertyChanged(nameof(MessageSectionVisibility));
+            OnPropertyChanged(nameof(UserSectionVisibility));
+            OnPropertyChanged(nameof(ProcessSectionVisibility));
+            OnPropertyChanged(nameof(ComputerSectionVisibility));
+            OnPropertyChanged(nameof(ChannelSectionVisibility));
+        });
+    }
+
+    private void OnDetailFieldVisibilityChanged()
+    {
+        _dispatcherQueue.TryEnqueue(() =>
+        {
+            OnPropertyChanged(nameof(DetailIdVisibility));
+            OnPropertyChanged(nameof(DetailLevelVisibility));
+            OnPropertyChanged(nameof(DetailTimeVisibility));
+            OnPropertyChanged(nameof(DetailProviderVisibility));
+            OnPropertyChanged(nameof(DetailProviderGuidVisibility));
+            OnPropertyChanged(nameof(DetailChannelVisibility));
+            OnPropertyChanged(nameof(DetailTaskVisibility));
+            OnPropertyChanged(nameof(DetailKeywordsVisibility));
+            OnPropertyChanged(nameof(DetailUserVisibility));
+            OnPropertyChanged(nameof(DetailProcessThreadVisibility));
+            OnPropertyChanged(nameof(DetailComputerVisibility));
+            OnPropertyChanged(nameof(DetailMessageVisibility));
+            OnPropertyChanged(nameof(DetailXmlVisibility));
+        });
     }
 
     private void OnMultiSelectChanged(SettingsService.FilterDimension dim)
@@ -893,6 +973,7 @@ public partial class MainViewModel : ObservableObject
                 SettingsService.FilterDimension.Computer => nameof(ComputerSelectionMode),
                 SettingsService.FilterDimension.Channel  => nameof(ChannelSelectionMode),
                 SettingsService.FilterDimension.Level    => nameof(LevelSelectionMode),
+                SettingsService.FilterDimension.Id       => nameof(IdSelectionMode),
                 _ => string.Empty
             });
 
@@ -905,6 +986,7 @@ public partial class MainViewModel : ObservableObject
                 SettingsService.FilterDimension.Computer => nameof(ComputerComboBoxVisibility),
                 SettingsService.FilterDimension.Channel  => nameof(ChannelComboBoxVisibility),
                 SettingsService.FilterDimension.Level    => nameof(LevelComboBoxVisibility),
+                SettingsService.FilterDimension.Id       => nameof(IdComboBoxVisibility),
                 _ => string.Empty
             });
             OnPropertyChanged(dim switch
@@ -915,6 +997,7 @@ public partial class MainViewModel : ObservableObject
                 SettingsService.FilterDimension.Computer => nameof(ComputerDropDownVisibility),
                 SettingsService.FilterDimension.Channel  => nameof(ChannelDropDownVisibility),
                 SettingsService.FilterDimension.Level    => nameof(LevelDropDownVisibility),
+                SettingsService.FilterDimension.Id       => nameof(IdDropDownVisibility),
                 _ => string.Empty
             });
         });
@@ -946,6 +1029,7 @@ public partial class MainViewModel : ObservableObject
             SettingsService.FilterDimension.User     => UserCategories,
             SettingsService.FilterDimension.Computer => ComputerCategories,
             SettingsService.FilterDimension.Channel  => ChannelCategories,
+            SettingsService.FilterDimension.Id       => IdCategories,
             _ => null
         };
         if (list == null) return;
@@ -970,6 +1054,7 @@ public partial class MainViewModel : ObservableObject
     public string UserFilterSummary     => Summarize(UserCategories,     "All Users");
     public string ComputerFilterSummary => Summarize(ComputerCategories, "All Computers");
     public string ChannelFilterSummary  => Summarize(ChannelCategories,  "All Channels");
+    public string IdFilterSummary       => Summarize(IdCategories,       "All IDs");
     public string LevelFilterSummary
     {
         get
@@ -995,6 +1080,7 @@ public partial class MainViewModel : ObservableObject
     public Visibility ComputerComboBoxVisibility => ComboVisible(SettingsService.FilterDimension.Computer);
     public Visibility ChannelComboBoxVisibility  => ComboVisible(SettingsService.FilterDimension.Channel);
     public Visibility LevelComboBoxVisibility    => ComboVisible(SettingsService.FilterDimension.Level);
+    public Visibility IdComboBoxVisibility       => ComboVisible(SettingsService.FilterDimension.Id);
 
     public Visibility SourceDropDownVisibility   => DropDownVisible(SettingsService.FilterDimension.Source);
     public Visibility ProcessDropDownVisibility  => DropDownVisible(SettingsService.FilterDimension.Process);
@@ -1002,6 +1088,7 @@ public partial class MainViewModel : ObservableObject
     public Visibility ComputerDropDownVisibility => DropDownVisible(SettingsService.FilterDimension.Computer);
     public Visibility ChannelDropDownVisibility  => DropDownVisible(SettingsService.FilterDimension.Channel);
     public Visibility LevelDropDownVisibility    => DropDownVisible(SettingsService.FilterDimension.Level);
+    public Visibility IdDropDownVisibility       => DropDownVisible(SettingsService.FilterDimension.Id);
 
     private static Visibility ComboVisible(SettingsService.FilterDimension dim) =>
         SettingsService.Instance.IsMultiSelectEnabled(dim) ? Visibility.Collapsed : Visibility.Visible;
@@ -1010,11 +1097,56 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>Whether any non-"All X" item in the dimension is currently selected.
     /// Drives the accent bar on the left of each filter section.</summary>
+    /// <summary>
+    /// Visibility of each side-panel filter section, governed by
+    /// Settings -> Filter visibility. Defaults to Visible (all sections shown).
+    /// </summary>
+    public Visibility TimeSectionVisibility     => GetSectionVisibility("Time");
+    public Visibility SourceSectionVisibility   => GetSectionVisibility("Source");
+    public Visibility LevelSectionVisibility    => GetSectionVisibility("Level");
+    public Visibility IdSectionVisibility       => GetSectionVisibility("Id");
+    public Visibility MessageSectionVisibility  => GetSectionVisibility("Message");
+    public Visibility UserSectionVisibility     => GetSectionVisibility("User");
+    public Visibility ProcessSectionVisibility  => GetSectionVisibility("Process");
+    public Visibility ComputerSectionVisibility => GetSectionVisibility("Computer");
+    public Visibility ChannelSectionVisibility  => GetSectionVisibility("Channel");
+
+    private static Visibility GetSectionVisibility(string key)
+    {
+        var saved = SettingsService.Instance.LoadFilterVisibility();
+        var visible = saved == null || !saved.TryGetValue(key, out var v) || v;
+        return visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // -- Event details pane field visibility ---------------------------------
+
+    public Visibility DetailIdVisibility            => GetDetailVisibility("Id");
+    public Visibility DetailLevelVisibility         => GetDetailVisibility("Level");
+    public Visibility DetailTimeVisibility          => GetDetailVisibility("Time");
+    public Visibility DetailProviderVisibility      => GetDetailVisibility("Provider");
+    public Visibility DetailProviderGuidVisibility  => GetDetailVisibility("ProviderGuid");
+    public Visibility DetailChannelVisibility       => GetDetailVisibility("Channel");
+    public Visibility DetailTaskVisibility          => GetDetailVisibility("Task");
+    public Visibility DetailKeywordsVisibility      => GetDetailVisibility("Keywords");
+    public Visibility DetailUserVisibility          => GetDetailVisibility("User");
+    public Visibility DetailProcessThreadVisibility => GetDetailVisibility("ProcessThread");
+    public Visibility DetailComputerVisibility      => GetDetailVisibility("Computer");
+    public Visibility DetailMessageVisibility       => GetDetailVisibility("Message");
+    public Visibility DetailXmlVisibility           => GetDetailVisibility("Xml");
+
+    private static Visibility GetDetailVisibility(string key)
+    {
+        var saved = SettingsService.Instance.LoadDetailFieldVisibility();
+        var visible = saved == null || !saved.TryGetValue(key, out var v) || v;
+        return visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     public bool IsSourceFilterActive   => SourceCategories.Any(c => c.IsSelected && !c.IsAllSources);
     public bool IsProcessFilterActive  => ProcessCategories.Any(c => c.IsSelected && !c.IsAllSources);
     public bool IsUserFilterActive     => UserCategories.Any(c => c.IsSelected && !c.IsAllSources);
     public bool IsComputerFilterActive => ComputerCategories.Any(c => c.IsSelected && !c.IsAllSources);
     public bool IsChannelFilterActive  => ChannelCategories.Any(c => c.IsSelected && !c.IsAllSources);
+    public bool IsIdFilterActive       => IdCategories.Any(c => c.IsSelected && !c.IsAllSources);
     public bool IsLevelFilterActive    => AvailableTypes.Any(t => t.IsSelected && t.Level.HasValue);
     public bool IsTimeFilterActive     => _selectedLoadWindow.Lookback != null || _selectedLoadWindow.IsCustom;
     public bool IsMessageFilterActive  => !string.IsNullOrEmpty(_searchText);
@@ -1025,6 +1157,7 @@ public partial class MainViewModel : ObservableObject
     public ListViewSelectionMode ComputerSelectionMode => Mode(SettingsService.FilterDimension.Computer);
     public ListViewSelectionMode ChannelSelectionMode  => Mode(SettingsService.FilterDimension.Channel);
     public ListViewSelectionMode LevelSelectionMode    => Mode(SettingsService.FilterDimension.Level);
+    public ListViewSelectionMode IdSelectionMode       => Mode(SettingsService.FilterDimension.Id);
 
     private static ListViewSelectionMode Mode(SettingsService.FilterDimension dim) =>
         SettingsService.Instance.IsMultiSelectEnabled(dim) ? ListViewSelectionMode.Multiple : ListViewSelectionMode.Single;
@@ -1041,6 +1174,7 @@ public partial class MainViewModel : ObservableObject
             Users     = SelectedUserNames().ToList(),
             Computers = SelectedComputerNames().ToList(),
             Channels  = SelectedChannelNames().ToList(),
+            Ids       = SelectedIdNames().ToList(),
             Levels    = AvailableTypes.Where(t => t.IsSelected && t.Level.HasValue).Select(t => t.Level!.Value.ToString()).ToList(),
             TimePreset = _selectedLoadWindow.Name,
             TimeStart  = _selectedLoadWindow.IsCustom && StartTime.HasValue ? (DateTime?)(StartTime.Value.Date + StartTimeOfDay) : null,
@@ -1064,6 +1198,7 @@ public partial class MainViewModel : ObservableObject
             ApplyNamesTo(UserCategories,     s.Users);
             ApplyNamesTo(ComputerCategories, s.Computers);
             ApplyNamesTo(ChannelCategories,  s.Channels);
+            ApplyNamesTo(IdCategories,       s.Ids);
 
             var wantedLevels = new HashSet<string>(s.Levels ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
             foreach (var t in AvailableTypes)
@@ -1127,6 +1262,7 @@ public partial class MainViewModel : ObservableObject
             foreach (var c in UserCategories)     c.IsSelected = false;
             foreach (var c in ComputerCategories) c.IsSelected = false;
             foreach (var c in ChannelCategories)  c.IsSelected = false;
+            foreach (var c in IdCategories)       c.IsSelected = false;
             foreach (var t in AvailableTypes)     t.IsSelected = false;
         }
         finally { _suppressApplyFilters = false; }
@@ -1178,6 +1314,7 @@ public partial class MainViewModel : ObservableObject
         var users     = SelectedUserNames();
         var computers = SelectedComputerNames();
         var channels  = SelectedChannelNames();
+        var ids       = SelectedIdNames();
         var levels    = SelectedLevelSet();
 
         return (sources.Count == 0    || sources.Contains(entry.ProviderName)) &&
@@ -1188,6 +1325,7 @@ public partial class MainViewModel : ObservableObject
                (users.Count == 0      || users.Contains(entry.Username ?? string.Empty)) &&
                (computers.Count == 0  || computers.Contains(entry.Computer ?? string.Empty)) &&
                (channels.Count == 0   || channels.Contains(entry.Channel ?? string.Empty)) &&
+               (ids.Count == 0        || ids.Contains(entry.Id.ToString())) &&
                (string.IsNullOrEmpty(SearchText) || entry.Message.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
     }
 
@@ -1211,12 +1349,13 @@ public partial class MainViewModel : ObservableObject
         var users     = SelectedUserNames();
         var computers = SelectedComputerNames();
         var channels  = SelectedChannelNames();
+        var ids       = SelectedIdNames();
         var levels    = SelectedLevelSet();
 
         var filtered = EventFilter.Apply(
             EventLogService.Instance.Events,
             sources, levels, startTime, endTime, users,
-            SearchText, processes, computers, channels);
+            SearchText, processes, computers, channels, ids, QuickFindText);
 
         if (filtered.Count > 500)
         {
@@ -1235,6 +1374,7 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(ComputerFilterSummary));
         OnPropertyChanged(nameof(ChannelFilterSummary));
         OnPropertyChanged(nameof(LevelFilterSummary));
+        OnPropertyChanged(nameof(IdFilterSummary));
 
         // Active-filter accent bars
         OnPropertyChanged(nameof(IsSourceFilterActive));
@@ -1243,6 +1383,7 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsComputerFilterActive));
         OnPropertyChanged(nameof(IsChannelFilterActive));
         OnPropertyChanged(nameof(IsLevelFilterActive));
+        OnPropertyChanged(nameof(IsIdFilterActive));
         OnPropertyChanged(nameof(IsTimeFilterActive));
         OnPropertyChanged(nameof(IsMessageFilterActive));
 

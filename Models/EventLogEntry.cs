@@ -1,7 +1,18 @@
 namespace SimpleEventViewer.Models;
 
-public class EventLogEntry
+public class EventLogEntry : System.ComponentModel.INotifyPropertyChanged
 {
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>
+    /// Manually fire INPC for a property. Used to force level-badge bindings
+    /// in visible DataGrid rows to re-evaluate their converter (e.g. when
+    /// the color scheme changes); the property values themselves don't
+    /// actually change.
+    /// </summary>
+    public void RaisePropertyChanged(string propertyName) =>
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(propertyName));
+
     public int Id { get; set; }
     public LogLevel Level { get; set; }
     public string LevelName => Level.ToString();

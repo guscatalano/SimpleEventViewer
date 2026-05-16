@@ -45,6 +45,8 @@ public class SettingsService
     private const string RememberColumnWidthsKey = "RememberColumnWidths";
     private const string ColumnWidthsKey = "ColumnWidths";
     private const string ColumnVisibilityKey = "ColumnVisibility";
+    private const string FilterVisibilityKey = "FilterVisibility";
+    private const string DetailFieldVisibilityKey = "DetailFieldVisibility";
     private const string McpServerEnabledKey = "McpServerEnabled";
     private const string McpServerPortKey = "McpServerPort";
     private const string ExperimentalFormatsKey = "ExperimentalFileFormats";
@@ -163,6 +165,110 @@ public class SettingsService
     /// a user launches the app. Kept here (rather than spread across XAML)
     /// so Settings can render checkboxes for them without duplicating the list.
     /// </summary>
+    public Dictionary<string, bool>? LoadFilterVisibility()
+    {
+        try
+        {
+            if (ApplicationData.Current.LocalSettings.Values[FilterVisibilityKey] is string s)
+            {
+                var result = new Dictionary<string, bool>();
+                foreach (var part in s.Split(';', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var eq = part.IndexOf('=');
+                    if (eq <= 0) continue;
+                    var key = part.Substring(0, eq);
+                    var val = part.Substring(eq + 1);
+                    result[key] = val == "1" || val.Equals("true", StringComparison.OrdinalIgnoreCase);
+                }
+                return result;
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    public void SaveFilterVisibility(IReadOnlyDictionary<string, bool> visibility)
+    {
+        try
+        {
+            var s = string.Join(";", visibility.Select(kv => $"{kv.Key}={(kv.Value ? 1 : 0)}"));
+            ApplicationData.Current.LocalSettings.Values[FilterVisibilityKey] = s;
+        }
+        catch { }
+        FilterVisibilityChanged?.Invoke();
+        DetailFieldVisibilityChanged?.Invoke();
+    }
+
+    public event Action? FilterVisibilityChanged;
+
+    public Dictionary<string, bool>? LoadDetailFieldVisibility()
+    {
+        try
+        {
+            if (ApplicationData.Current.LocalSettings.Values[DetailFieldVisibilityKey] is string s)
+            {
+                var result = new Dictionary<string, bool>();
+                foreach (var part in s.Split(';', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var eq = part.IndexOf('=');
+                    if (eq <= 0) continue;
+                    var key = part.Substring(0, eq);
+                    var val = part.Substring(eq + 1);
+                    result[key] = val == "1" || val.Equals("true", StringComparison.OrdinalIgnoreCase);
+                }
+                return result;
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    public void SaveDetailFieldVisibility(IReadOnlyDictionary<string, bool> visibility)
+    {
+        try
+        {
+            var s = string.Join(";", visibility.Select(kv => $"{kv.Key}={(kv.Value ? 1 : 0)}"));
+            ApplicationData.Current.LocalSettings.Values[DetailFieldVisibilityKey] = s;
+        }
+        catch { }
+        DetailFieldVisibilityChanged?.Invoke();
+    }
+
+    public event Action? DetailFieldVisibilityChanged;
+
+    /// <summary>Detail-pane fields, in display order. All visible by default.</summary>
+    public static readonly (string Key, string Label)[] AvailableDetailFields =
+    {
+        ("Id",            "Event ID"),
+        ("Level",         "Level"),
+        ("Time",          "Time Created"),
+        ("Provider",      "Provider"),
+        ("ProviderGuid",  "Provider GUID"),
+        ("Channel",       "Channel"),
+        ("Task",          "Task"),
+        ("Keywords",      "Keywords"),
+        ("User",          "User"),
+        ("ProcessThread", "Process / Thread"),
+        ("Computer",      "Computer"),
+        ("Message",       "Message"),
+        ("Xml",           "XML view"),
+    };
+
+    /// <summary>Filter sections shown in the left panel, in display order.
+    /// Each section can be hidden via Settings. All visible by default.</summary>
+    public static readonly (string Key, string Label)[] AvailableFilterSections =
+    {
+        ("Time",     "Time Range"),
+        ("Source",   "Event Source"),
+        ("Level",    "Event Level"),
+        ("Id",       "Event ID"),
+        ("Message",  "Message"),
+        ("User",     "User"),
+        ("Process",  "Process"),
+        ("Computer", "Computer"),
+        ("Channel",  "Channel"),
+    };
+
     public static readonly (string Tag, string Label, bool DefaultVisible)[] AvailableColumns =
     {
         ("Time",    "Time",    true),
@@ -333,7 +439,7 @@ public class SettingsService
     /// toolbar can show/hide the XML and ETL buttons.</summary>
     public event Action? ExperimentalFormatsChanged;
 
-    public enum FilterDimension { Source, Level, User, Process, Computer, Channel }
+    public enum FilterDimension { Source, Level, User, Process, Computer, Channel, Id }
 
     public bool IsMultiSelectEnabled(FilterDimension dim)
     {
@@ -342,9 +448,11 @@ public class SettingsService
             if (ApplicationData.Current.LocalSettings.Values[MultiSelectKeyPrefix + dim] is bool b) return b;
         }
         catch { }
-        // Defaults reflect typical usage: Source and Level are often used to
-        // OR a few values together; the rest are usually "narrow to one".
-        return dim == FilterDimension.Source || dim == FilterDimension.Level;
+        // Defaults reflect typical usage: Source, Level, and Id are often
+        // used to OR a few values together; the rest are usually "narrow to one".
+        return dim == FilterDimension.Source
+            || dim == FilterDimension.Level
+            || dim == FilterDimension.Id;
     }
 
     public void SetMultiSelectEnabled(FilterDimension dim, bool value)
@@ -413,6 +521,8 @@ public class SettingsService
             s.Remove(McpServerPortKey);
             s.Remove(ExperimentalFormatsKey);
             s.Remove(TitleFormatKey);
+            s.Remove(FilterVisibilityKey);
+            s.Remove(DetailFieldVisibilityKey);
             foreach (FilterDimension d in Enum.GetValues(typeof(FilterDimension)))
             {
                 s.Remove(MultiSelectKeyPrefix + d);
@@ -428,6 +538,7 @@ public class SettingsService
         ExperimentalFormatsChanged?.Invoke();
         ColumnVisibilityChanged?.Invoke();
         TitleFormatChanged?.Invoke();
+        FilterVisibilityChanged?.Invoke();
 
         // Stop the MCP server if it was running — default is off.
         Mcp.EventLogMcpServer.Instance.Stop();

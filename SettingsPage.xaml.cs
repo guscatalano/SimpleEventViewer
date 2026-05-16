@@ -59,6 +59,8 @@ public sealed partial class SettingsPage : Page
         ExperimentalFormatsSwitch.IsOn = SettingsService.Instance.ExperimentalFileFormats;
 
         BuildColumnVisibilityChecks();
+        BuildFilterVisibilityChecks();
+        BuildDetailFieldVisibilityChecks();
         BuildMultiSelectToggles();
 
         // MCP server
@@ -118,6 +120,62 @@ public sealed partial class SettingsPage : Page
         SettingsService.Instance.SaveColumnVisibility(visibility);
     }
 
+    private void BuildFilterVisibilityChecks()
+    {
+        FilterVisibilityPanel.Children.Clear();
+        var saved = SettingsService.Instance.LoadFilterVisibility();
+
+        foreach (var (key, label) in SettingsService.AvailableFilterSections)
+        {
+            var isOn = saved == null || !saved.TryGetValue(key, out var v) || v;
+            var check = new CheckBox { Content = label, Tag = key, IsChecked = isOn };
+            check.Checked += FilterVisibilityCheck_Changed;
+            check.Unchecked += FilterVisibilityCheck_Changed;
+            FilterVisibilityPanel.Children.Add(check);
+        }
+    }
+
+    private void FilterVisibilityCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        var visibility = new Dictionary<string, bool>();
+        foreach (var child in FilterVisibilityPanel.Children)
+        {
+            if (child is CheckBox cb && cb.Tag is string key)
+            {
+                visibility[key] = cb.IsChecked == true;
+            }
+        }
+        SettingsService.Instance.SaveFilterVisibility(visibility);
+    }
+
+    private void BuildDetailFieldVisibilityChecks()
+    {
+        DetailFieldVisibilityPanel.Children.Clear();
+        var saved = SettingsService.Instance.LoadDetailFieldVisibility();
+
+        foreach (var (key, label) in SettingsService.AvailableDetailFields)
+        {
+            var isOn = saved == null || !saved.TryGetValue(key, out var v) || v;
+            var check = new CheckBox { Content = label, Tag = key, IsChecked = isOn };
+            check.Checked += DetailFieldCheck_Changed;
+            check.Unchecked += DetailFieldCheck_Changed;
+            DetailFieldVisibilityPanel.Children.Add(check);
+        }
+    }
+
+    private void DetailFieldCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        var visibility = new Dictionary<string, bool>();
+        foreach (var child in DetailFieldVisibilityPanel.Children)
+        {
+            if (child is CheckBox cb && cb.Tag is string key)
+            {
+                visibility[key] = cb.IsChecked == true;
+            }
+        }
+        SettingsService.Instance.SaveDetailFieldVisibility(visibility);
+    }
+
     private void BuildMultiSelectToggles()
     {
         MultiSelectTogglesPanel.Children.Clear();
@@ -128,6 +186,7 @@ public sealed partial class SettingsPage : Page
             {
                 SettingsService.FilterDimension.Source   => "Event Source",
                 SettingsService.FilterDimension.Level    => "Event Level",
+                SettingsService.FilterDimension.Id       => "Event ID",
                 SettingsService.FilterDimension.User     => "User",
                 SettingsService.FilterDimension.Process  => "Process",
                 SettingsService.FilterDimension.Computer => "Computer",
@@ -359,6 +418,26 @@ public sealed partial class SettingsPage : Page
         SettingsPage_Loaded(this, new RoutedEventArgs());
     }
 
+    private void SettingsNav_BackRequested(NavigationView sender, NavigationViewBackRequestedEventArgs args)
+    {
+        BackButton_Click(this, new RoutedEventArgs());
+    }
+
+    private void SettingsNav_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+    {
+        if (args.SelectedItem is NavigationViewItem item && item.Tag is string targetName)
+        {
+            if (FindName(targetName) is FrameworkElement card)
+            {
+                card.StartBringIntoView(new BringIntoViewOptions
+                {
+                    AnimationDesired = true,
+                    VerticalAlignmentRatio = 0.0
+                });
+            }
+        }
+    }
+
     private void BackButton_Click(object sender, RoutedEventArgs e)
     {
         if (Frame.CanGoBack)
@@ -382,55 +461,85 @@ public static class ColorSchemes
     {
         return scheme switch
         {
-            "Blue"   => Color.FromArgb(255,   0, 120, 212),
-            "Green"  => Color.FromArgb(255,  56, 142,  60),
-            "Purple" => Color.FromArgb(255, 123,  31, 162),
-            "Orange" => Color.FromArgb(255, 230,  81,   0),
-            "Red"    => Color.FromArgb(255, 211,  47,  47),
-            _        => Color.FromArgb(255,   0, 120, 212) // Windows default-ish
+            "Blue"    => Color.FromArgb(255,   0, 120, 212),
+            "Teal"    => Color.FromArgb(255,   0, 137, 123),
+            "Cyan"    => Color.FromArgb(255,   0, 188, 212),
+            "Green"   => Color.FromArgb(255,  56, 142,  60),
+            "Lime"    => Color.FromArgb(255, 124, 179,  66),
+            "Amber"   => Color.FromArgb(255, 255, 160,   0),
+            "Orange"  => Color.FromArgb(255, 230,  81,   0),
+            "Red"     => Color.FromArgb(255, 211,  47,  47),
+            "Crimson" => Color.FromArgb(255, 220,  20,  60),
+            "Pink"    => Color.FromArgb(255, 233,  30,  99),
+            "Magenta" => Color.FromArgb(255, 194,  24,  91),
+            "Purple"  => Color.FromArgb(255, 123,  31, 162),
+            "Indigo"  => Color.FromArgb(255,  63,  81, 181),
+            "Slate"   => Color.FromArgb(255,  84, 110, 122),
+            "Brown"   => Color.FromArgb(255, 121,  85,  72),
+
+            // Themed palettes pick a signature hue for the app accent.
+            "Pastel"     => Color.FromArgb(255, 129, 199, 132),
+            "Vibrant"    => Color.FromArgb(255,   0, 184, 212),
+            "Cyberpunk"  => Color.FromArgb(255,   0, 229, 255),
+            "Forest"     => Color.FromArgb(255,  46, 125,  50),
+            "Ocean"      => Color.FromArgb(255,   0, 151, 167),
+            "Sunset"     => Color.FromArgb(255, 255, 152,   0),
+            "Earth"      => Color.FromArgb(255, 104, 159,  56),
+            "Royal"      => Color.FromArgb(255,  74,  20, 140),
+            "Mono"       => Color.FromArgb(255, 117, 117, 117),
+
+            _         => Color.FromArgb(255,   0, 120, 212) // Windows default-ish
         };
     }
 
+    /// <summary>
+    /// (critical, error, warning, info) palette for each scheme. Designed so
+    /// every level uses a visually distinct hue — Critical and Error stay
+    /// red-leaning (severity recognition is universal), Warning is yellow-
+    /// or amber-leaning, and Info takes the scheme's signature color. A few
+    /// "themed" schemes (Mono, Pastel, Cyberpunk, etc.) break the convention
+    /// for variety.
+    /// </summary>
     public static (Color critical, Color error, Color warning, Color info) GetColors(string scheme)
     {
         return scheme switch
         {
-            "Blue" => (
-                Color.FromArgb(255, 0, 90, 158),
-                Color.FromArgb(255, 0, 120, 212),
-                Color.FromArgb(255, 144, 202, 249),
-                Color.FromArgb(255, 100, 181, 246)
-            ),
-            "Green" => (
-                Color.FromArgb(255, 27, 94, 32),
-                Color.FromArgb(255, 56, 142, 60),
-                Color.FromArgb(255, 174, 213, 129),
-                Color.FromArgb(255, 102, 187, 106)
-            ),
-            "Purple" => (
-                Color.FromArgb(255, 74, 20, 140),
-                Color.FromArgb(255, 123, 31, 162),
-                Color.FromArgb(255, 206, 147, 216),
-                Color.FromArgb(255, 156, 39, 176)
-            ),
-            "Orange" => (
-                Color.FromArgb(255, 191, 54, 12),
-                Color.FromArgb(255, 230, 81, 0),
-                Color.FromArgb(255, 255, 183, 77),
-                Color.FromArgb(255, 255, 152, 0)
-            ),
-            "Red" => (
-                Color.FromArgb(255, 183, 28, 28),
-                Color.FromArgb(255, 211, 47, 47),
-                Color.FromArgb(255, 239, 154, 154),
-                Color.FromArgb(255, 244, 67, 54)
-            ),
+            // --- single-accent schemes: traffic-light reds + amber + accent ---
+            "Blue"    => (RGB(183, 28, 28),  RGB(229, 57,  53),  RGB(255, 160,  0), RGB( 30, 136, 229)),
+            "Teal"    => (RGB(183, 28, 28),  RGB(229, 57,  53),  RGB(255, 160,  0), RGB(  0, 137, 123)),
+            "Cyan"    => (RGB(183, 28, 28),  RGB(229, 57,  53),  RGB(255, 160,  0), RGB(  0, 172, 193)),
+            "Green"   => (RGB(183, 28, 28),  RGB(229, 57,  53),  RGB(255, 160,  0), RGB( 67, 160,  71)),
+            "Lime"    => (RGB(183, 28, 28),  RGB(229, 57,  53),  RGB(255, 160,  0), RGB(124, 179,  66)),
+            "Amber"   => (RGB(183, 28, 28),  RGB(229, 57,  53),  RGB(251, 140,  0), RGB(255, 193,   7)),
+            "Orange"  => (RGB(183, 28, 28),  RGB(229, 57,  53),  RGB(255, 193,  7), RGB(245, 124,   0)),
+            "Red"     => (RGB(127, 17, 17),  RGB(211, 47,  47),  RGB(255, 152,  0), RGB(244, 67,   54)),
+            "Crimson" => (RGB(136,  0, 21),  RGB(220, 20,  60),  RGB(255, 167,  38), RGB(216, 27,  96)),
+            "Pink"    => (RGB(173, 20, 87),  RGB(229, 57,  53),  RGB(255, 167,  38), RGB(233, 30,   99)),
+            "Magenta" => (RGB(136, 14, 79),  RGB(229, 57,  53),  RGB(255, 167,  38), RGB(194, 24,   91)),
+            "Purple"  => (RGB(183, 28, 28),  RGB(229, 57,  53),  RGB(255, 160,  0), RGB(142, 36,  170)),
+            "Indigo"  => (RGB(183, 28, 28),  RGB(229, 57,  53),  RGB(255, 160,  0), RGB( 57,  73, 171)),
+            "Slate"   => (RGB(183, 28, 28),  RGB(229, 57,  53),  RGB(255, 160,  0), RGB( 84, 110, 122)),
+            "Brown"   => (RGB(183, 28, 28),  RGB(229, 57,  53),  RGB(255, 160,  0), RGB(109,  76,  65)),
+
+            // --- themed palettes: 4 deliberately different hues ---
+            "Pastel"     => (RGB(229, 115, 115), RGB(255, 138, 101), RGB(255, 213, 79),  RGB(129, 199, 132)),
+            "Vibrant"    => (RGB(213,   0,   0), RGB(255,  61,   0), RGB(255, 214,   0), RGB(  0, 184, 212)),
+            "Cyberpunk"  => (RGB(255,  23,  68), RGB(245,   0,  87), RGB(255, 234,   0), RGB(  0, 229, 255)),
+            "Forest"     => (RGB(136,  14,  79), RGB(216,  67,  21), RGB(255, 179,   0), RGB( 46, 125,  50)),
+            "Ocean"      => (RGB(136,  14,  79), RGB(211,  47,  47), RGB(255, 193,   7), RGB(  0, 151, 167)),
+            "Sunset"     => (RGB(136,   0,  21), RGB(216,  27,  96), RGB(255, 152,   0), RGB(255, 213,  79)),
+            "Earth"      => (RGB(141,  37,   8), RGB(191,  54,  12), RGB(255, 167,  38), RGB(104, 159,  56)),
+            "Royal"      => (RGB(136,  14,  79), RGB(173,  20,  87), RGB(241, 196,  15), RGB( 74,  20, 140)),
+            "Mono"       => (RGB( 33,  33,  33), RGB( 97,  97,  97), RGB(189, 189, 189), RGB(189, 189, 189)),
+
             _ => (
-                Color.FromArgb(255, 196, 43, 28),
-                Color.FromArgb(255, 232, 17, 35),
-                Color.FromArgb(255, 252, 211, 91),
-                Color.FromArgb(255, 0, 120, 212)
+                RGB(196, 43, 28),
+                RGB(232, 17, 35),
+                RGB(252, 211, 91),
+                RGB(  0, 120, 212)
             )
         };
     }
+
+    private static Color RGB(byte r, byte g, byte b) => Color.FromArgb(255, r, g, b);
 }

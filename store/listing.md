@@ -58,6 +58,18 @@ Whether you're investigating a crash, hunting down a flaky service, or pulling e
 
 Free, no telemetry, no ads.
 
+## What's new (1.2.0)
+
+- Event ID is now a multi-select filter alongside Source/Level/User/Process/Computer/Channel
+- Right-click a column header for sort / hide / inline "Filter by…" with checkboxes
+- Ctrl+F quick find across Message, Source, and Level
+- Per-filter and per-detail-field visibility toggles in Settings
+- 9 new themed color palettes (Pastel, Vibrant, Cyberpunk, Forest, Ocean, Sunset, Earth, Royal, Mono) + 10 single-accent schemes, all using genuinely distinct hues per event level
+- Settings split into focused cards with a left navigation pane and an always-visible Back button
+- Refresh button is contextual: "Refresh live logs" or "Reload sample.evtx" — and Refresh re-reads the current source instead of always switching to live
+- Row tints update instantly when the color scheme changes (no more scrolling to refresh)
+- Start menu name now reads "Simple Event Viewer"
+
 ## What's new (1.1.0)
 
 - Multi-select on every filter except Time and Message — per-filter toggle in Settings (defaults: Source + Level multi, others single)

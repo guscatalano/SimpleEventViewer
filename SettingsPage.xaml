@@ -9,22 +9,80 @@
     mc:Ignorable="d">
 
     <Grid>
-    <ScrollViewer>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Full-width title bar. Back button + "Settings" caption sit here so
+             the NavigationView below starts at the same Y as the cards. -->
+        <Border Grid.Row="0" Padding="20,12"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                <Button x:Name="BackButton"
+                        Click="BackButton_Click" Padding="14,8"
+                        AutomationProperties.Name="Back"
+                        ToolTipService.ToolTip="Back to events">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE72B;" FontSize="16" />
+                        <TextBlock Text="Back" FontSize="14" FontWeight="SemiBold" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Text="Settings" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </StackPanel>
+        </Border>
+
+    <NavigationView x:Name="SettingsNav" Grid.Row="1"
+                    IsBackButtonVisible="Collapsed"
+                    IsSettingsVisible="False"
+                    PaneDisplayMode="Left"
+                    OpenPaneLength="220"
+                    IsPaneToggleButtonVisible="False"
+                    SelectionChanged="SettingsNav_SelectionChanged">
+        <NavigationView.MenuItems>
+            <NavigationViewItem Content="Theme &amp; Colors"     Tag="ThemeColorsCard">
+                <NavigationViewItem.Icon><FontIcon Glyph="&#xE790;" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem Content="Window"             Tag="WindowCard">
+                <NavigationViewItem.Icon><FontIcon Glyph="&#xE737;" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem Content="Events grid"        Tag="EventsGridCard">
+                <NavigationViewItem.Icon><FontIcon Glyph="&#xE71D;" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem Content="Event details pane" Tag="EventDetailsPaneCard">
+                <NavigationViewItem.Icon><FontIcon Glyph="&#xE946;" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem Content="Filter panel"       Tag="FilterPanelCard">
+                <NavigationViewItem.Icon><FontIcon Glyph="&#xE71C;" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem Content="Filter multi-select" Tag="FilterMultiSelectCard">
+                <NavigationViewItem.Icon><FontIcon Glyph="&#xE73A;" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem Content="Experimental"       Tag="ExperimentalCard">
+                <NavigationViewItem.Icon><FontIcon Glyph="&#xE9F5;" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem Content="MCP server"         Tag="McpCard">
+                <NavigationViewItem.Icon><FontIcon Glyph="&#xE968;" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem Content="Restore defaults"   Tag="RestoreCard">
+                <NavigationViewItem.Icon><FontIcon Glyph="&#xE777;" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem Content="About"              Tag="AboutCard">
+                <NavigationViewItem.Icon><FontIcon Glyph="&#xE946;" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
+        </NavigationView.MenuItems>
+
+    <ScrollViewer x:Name="SettingsScrollViewer">
         <StackPanel Padding="24" Spacing="16" MaxWidth="800" HorizontalAlignment="Stretch">
 
-            <StackPanel Orientation="Horizontal" Spacing="12">
-                <Button Click="BackButton_Click" Padding="8">
-                    <FontIcon Glyph="&#xE72B;" FontSize="14" />
-                </Button>
-                <TextBlock Text="Settings" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center" />
-            </StackPanel>
-
-            <!-- Appearance Card -->
-            <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+            <!-- Theme & Colors -->
+            <Border x:Name="ThemeColorsCard" Background="{ThemeResource LayerFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1" CornerRadius="8" Padding="20">
                 <StackPanel Spacing="16">
-                    <TextBlock Text="Appearance" FontSize="18" FontWeight="SemiBold" />
+                    <TextBlock Text="Theme &amp; Colors" FontSize="18" FontWeight="SemiBold" />
 
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -57,14 +115,50 @@
                             <TextBlock Text="Accent color used app-wide (buttons, selection, badges)" Opacity="0.7" FontSize="12" />
                         </StackPanel>
                         <ComboBox Grid.Column="1" x:Name="ColorSchemeComboBox" SelectionChanged="ColorSchemeComboBox_SelectionChanged" Width="200">
-                            <ComboBoxItem Content="Default" Tag="Default" />
-                            <ComboBoxItem Content="Blue" Tag="Blue" />
-                            <ComboBoxItem Content="Green" Tag="Green" />
-                            <ComboBoxItem Content="Purple" Tag="Purple" />
-                            <ComboBoxItem Content="Orange" Tag="Orange" />
-                            <ComboBoxItem Content="Red" Tag="Red" />
+                            <ComboBoxItem Content="Default"   Tag="Default" />
+                            <ComboBoxItem Content="Blue"      Tag="Blue" />
+                            <ComboBoxItem Content="Teal"      Tag="Teal" />
+                            <ComboBoxItem Content="Cyan"      Tag="Cyan" />
+                            <ComboBoxItem Content="Green"     Tag="Green" />
+                            <ComboBoxItem Content="Lime"      Tag="Lime" />
+                            <ComboBoxItem Content="Amber"     Tag="Amber" />
+                            <ComboBoxItem Content="Orange"    Tag="Orange" />
+                            <ComboBoxItem Content="Red"       Tag="Red" />
+                            <ComboBoxItem Content="Crimson"   Tag="Crimson" />
+                            <ComboBoxItem Content="Pink"      Tag="Pink" />
+                            <ComboBoxItem Content="Magenta"   Tag="Magenta" />
+                            <ComboBoxItem Content="Purple"    Tag="Purple" />
+                            <ComboBoxItem Content="Indigo"    Tag="Indigo" />
+                            <ComboBoxItem Content="Slate"     Tag="Slate" />
+                            <ComboBoxItem Content="Brown"     Tag="Brown" />
+                            <ComboBoxItem Content="—— themed palettes ——" IsEnabled="False" />
+                            <ComboBoxItem Content="Pastel"    Tag="Pastel" />
+                            <ComboBoxItem Content="Vibrant"   Tag="Vibrant" />
+                            <ComboBoxItem Content="Cyberpunk" Tag="Cyberpunk" />
+                            <ComboBoxItem Content="Forest"    Tag="Forest" />
+                            <ComboBoxItem Content="Ocean"     Tag="Ocean" />
+                            <ComboBoxItem Content="Sunset"    Tag="Sunset" />
+                            <ComboBoxItem Content="Earth"     Tag="Earth" />
+                            <ComboBoxItem Content="Royal"     Tag="Royal" />
+                            <ComboBoxItem Content="Mono"      Tag="Mono" />
                         </ComboBox>
                     </Grid>
+
+                    <!-- Color preview right under Color Scheme so the effect is visible. -->
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Border x:Name="CriticalSwatch" Width="80" Height="28" CornerRadius="4">
+                            <TextBlock Text="Critical" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" />
+                        </Border>
+                        <Border x:Name="ErrorSwatch" Width="80" Height="28" CornerRadius="4">
+                            <TextBlock Text="Error" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" />
+                        </Border>
+                        <Border x:Name="WarningSwatch" Width="80" Height="28" CornerRadius="4">
+                            <TextBlock Text="Warning" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" />
+                        </Border>
+                        <Border x:Name="InfoSwatch" Width="80" Height="28" CornerRadius="4">
+                            <TextBlock Text="Info" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" />
+                        </Border>
+                    </StackPanel>
 
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -80,6 +174,15 @@
                             <ComboBoxItem Content="Entire row" Tag="1" />
                         </ComboBox>
                     </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Window -->
+            <Border x:Name="WindowCard" Background="{ThemeResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="20">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="Window" FontSize="18" FontWeight="SemiBold" />
 
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -96,6 +199,15 @@
                             <ComboBoxItem Content="Simple Event Viewer — source" Tag="2" />
                         </ComboBox>
                     </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Events grid -->
+            <Border x:Name="EventsGridCard" Background="{ThemeResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="20">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="Events grid" FontSize="18" FontWeight="SemiBold" />
 
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -135,30 +247,41 @@
                         <TextBlock Text="Pick which columns appear in the events grid. Changes apply immediately." Opacity="0.7" FontSize="12" />
                         <StackPanel x:Name="ColumnVisibilityPanel" Spacing="4" Margin="0,4,0,0" />
                     </StackPanel>
+                </StackPanel>
+            </Border>
 
-                    <!-- Preview swatches -->
-                    <StackPanel Spacing="8" Margin="0,8,0,0">
-                        <TextBlock Text="Color Preview" FontWeight="SemiBold" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Border x:Name="CriticalSwatch" Width="80" Height="32" CornerRadius="4">
-                                <TextBlock Text="Critical" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" />
-                            </Border>
-                            <Border x:Name="ErrorSwatch" Width="80" Height="32" CornerRadius="4">
-                                <TextBlock Text="Error" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" />
-                            </Border>
-                            <Border x:Name="WarningSwatch" Width="80" Height="32" CornerRadius="4">
-                                <TextBlock Text="Warning" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" />
-                            </Border>
-                            <Border x:Name="InfoSwatch" Width="80" Height="32" CornerRadius="4">
-                                <TextBlock Text="Info" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" />
-                            </Border>
-                        </StackPanel>
+            <!-- Event details pane -->
+            <Border x:Name="EventDetailsPaneCard" Background="{ThemeResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="20">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="Event details pane" FontSize="18" FontWeight="SemiBold" />
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Visible fields" FontWeight="SemiBold" />
+                        <TextBlock Text="Pick which fields show in the bottom event details panel. All on by default." Opacity="0.7" FontSize="12" />
+                        <StackPanel x:Name="DetailFieldVisibilityPanel" Spacing="4" Margin="0,4,0,0" />
                     </StackPanel>
                 </StackPanel>
             </Border>
 
-            <!-- Filter multi-select Card -->
-            <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+            <!-- Filter panel -->
+            <Border x:Name="FilterPanelCard" Background="{ThemeResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="20">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="Filter panel" FontSize="18" FontWeight="SemiBold" />
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Visible filter sections" FontWeight="SemiBold" />
+                        <TextBlock Text="Pick which sections appear in the filter side panel. All on by default." Opacity="0.7" FontSize="12" />
+                        <StackPanel x:Name="FilterVisibilityPanel" Spacing="4" Margin="0,4,0,0" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Filter multi-select -->
+            <Border x:Name="FilterMultiSelectCard" Background="{ThemeResource LayerFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1" CornerRadius="8" Padding="20">
                 <StackPanel Spacing="12">
@@ -170,7 +293,7 @@
             </Border>
 
             <!-- Experimental Card -->
-            <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+            <Border x:Name="ExperimentalCard" Background="{ThemeResource LayerFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1" CornerRadius="8" Padding="20">
                 <StackPanel Spacing="12">
@@ -193,7 +316,7 @@
             </Border>
 
             <!-- MCP Server Card -->
-            <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+            <Border x:Name="McpCard" Background="{ThemeResource LayerFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1" CornerRadius="8" Padding="20">
                 <StackPanel Spacing="16">
@@ -332,7 +455,7 @@
             </Border>
 
             <!-- Restore defaults -->
-            <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+            <Border x:Name="RestoreCard" Background="{ThemeResource LayerFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1" CornerRadius="8" Padding="20">
                 <Grid>
@@ -355,7 +478,7 @@
             </Border>
 
             <!-- About Card -->
-            <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+            <Border x:Name="AboutCard" Background="{ThemeResource LayerFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1" CornerRadius="8" Padding="20">
                 <StackPanel Spacing="8">
@@ -371,10 +494,11 @@
 
         </StackPanel>
     </ScrollViewer>
+    </NavigationView>
 
     <!-- Busy overlay shown while a heavy operation (theme apply, accent
          apply) runs. Sits above all content and intercepts pointer input. -->
-    <Border x:Name="BusyOverlay" Visibility="Collapsed"
+    <Border x:Name="BusyOverlay" Grid.RowSpan="2" Visibility="Collapsed"
             Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}"
             Opacity="0.85">
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">

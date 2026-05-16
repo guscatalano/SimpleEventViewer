@@ -52,3 +52,9 @@ _ReSharper*/
 # Generated files
 Generated\ Files/
 *_wpftmp.csproj
+
+## Local test exports — produced by Save/Export from the running app
+samples/events-*.xml
+samples/events-*.csv
+samples/events-*.json
+samples/filters-*.json
