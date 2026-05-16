@@ -212,4 +212,4 @@ Almost entirely vibe-coded with [Claude Code](https://www.anthropic.com/claude-c
 
 ## License & credits
 
-Created by Gus Catalano — [github.com/guscatalano](https://github.com/guscatalano).
+[MIT-licensed](LICENSE) — © 2026 Gus Catalano. Created by [github.com/guscatalano](https://github.com/guscatalano).
