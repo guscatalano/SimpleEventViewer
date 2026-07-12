@@ -100,6 +100,9 @@ All settings persist to `ApplicationData.Current.LocalSettings`.
 Optional in-process server that exposes the currently-loaded events to an LLM client over local HTTP+JSON-RPC. Enable it from **Settings → MCP Server**.
 
 - Bound to `127.0.0.1` only — not reachable from the network
+- **No authentication.** While it's enabled, any local process (including a web
+  page open in your browser, via CORS) can query the events you have loaded.
+  Enable it only when you need it and disable it when you're done.
 - Default port: `7321`
 - Single endpoint: `POST http://127.0.0.1:<port>/` accepts JSON-RPC 2.0 messages
 - Supported methods: `initialize`, `tools/list`, `tools/call`, `ping`
