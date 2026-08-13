@@ -1,0 +1,28 @@
+{
+  "_comment": "Listing-as-code for the Microsoft Store (product 9N63Z84M7ZWK, language en-us). These are the BaseListing fields the release job manages; CI reads the current submission, overwrites exactly these keys, and pushes it back (so unmanaged fields like pricing/availability are never touched). Store limits: Title<=256, ShortDescription<=1000, Description<=10000, each Feature<=200 (<=20 items), ReleaseNotes<=1500, Keywords<=7 (<=30 each). Title MUST match the reserved app name in Partner Center. Edit this file to change the listing; the next v* tag publishes it. Screenshots: store/screenshots/*.png.",
+  "Title": "Simple Event Viewer",
+  "ShortTitle": null,
+  "ShortDescription": "A fast, modern viewer for Windows Event Logs. Stream live events or open .evtx files, filter and search across millions of entries, and copy results out as text, CSV, or JSON.",
+  "Description": "Simple Event Viewer is a clean, keyboard-friendly alternative to the built-in Windows Event Viewer — built with WinUI 3 and designed for everyday troubleshooting.\n\nWhether you're investigating a crash, hunting down a flaky service, or pulling evidence for a postmortem, Simple Event Viewer lets you get to the events that matter without fighting an MMC console.\n\nREAD EVENTS FROM ANYWHERE\n• Live Windows event logs (Application channel) — streamed in batches so the UI stays responsive even for 50,000+ entries\n• Saved .evtx files — open them by drag-and-drop, file picker, or command line\n\nFILTER THE WAY YOU ACTUALLY THINK\n• Time range (Last hour / 24h / 7d / 30d / All / Custom)\n• Event level (Critical / Error / Warning / Information / Verbose)\n• Source, user, process ID, computer, channel — each picker shows live counts\n• Full-text message search\n\nINSPECT EVERY DETAIL\n• Sortable, resizable, reorderable columns that remember widths across launches\n• Full event details pane with copy buttons on every field\n• Raw event XML view when you need the wire format\n\nCOPY AND EXPORT\n• Copy a single cell, a whole row, or any selection\n• Export to CSV (escaped) or JSON (pretty-printed)\n\nEIGHT THEMES TO SUIT YOUR SETUP\n• System, Light, Dark, High Contrast, Nord, Dracula, Solarized, Sepia\n• Independent accent picker (Blue, Green, Purple, Orange, Red) when you're not on a curated preset\n\nOPTIONAL LOCAL MCP SERVER\n• Toggle on a 127.0.0.1-bound Model Context Protocol server and let an LLM client (VS Code, Cursor, Claude Desktop, Claude Code) query the currently-loaded events. Built-in tools for listing, searching, and inspecting events.\n\nDESIGNED FOR PERFORMANCE\n• Streaming reads, throttled UI updates, and background prefetch of older events so widening a time range is instant\n• All filtering happens in-memory once data is loaded\n\nFree, no telemetry, no ads.",
+  "Keywords": [
+    "event viewer",
+    "evtx",
+    "event log",
+    "log viewer",
+    "windows logs",
+    "troubleshooting",
+    "MCP server"
+  ],
+  "Features": [
+    "Live Windows event logs and .evtx files",
+    "Rich filters: time range, level, source, user, process, computer, channel, message search",
+    "Sortable, resizable, reorderable columns with persisted widths",
+    "Copy as text / CSV / JSON",
+    "Light, Dark, Nord, Dracula, Solarized, Sepia, High Contrast themes",
+    "Local MCP server for LLM integrations"
+  ],
+  "ReleaseNotes": "Version 1.2.0\n• Event ID is now a multi-select filter alongside Source/Level/User/Process/Computer/Channel\n• Right-click a column header for sort / hide / inline \"Filter by…\" with checkboxes\n• Ctrl+F quick find across Message, Source, and Level\n• Per-filter and per-detail-field visibility toggles in Settings\n• 9 new themed color palettes (Pastel, Vibrant, Cyberpunk, Forest, Ocean, Sunset, Earth, Royal, Mono) plus 10 single-accent schemes, all using genuinely distinct hues per event level\n• Settings split into focused cards with a left navigation pane and an always-visible Back button\n• Contextual Refresh (\"Refresh live logs\" / \"Reload sample.evtx\") that re-reads the current source instead of always switching to live\n• Row tints update instantly when the color scheme changes\n• Start menu name now reads \"Simple Event Viewer\"",
+  "CopyrightAndTrademarkInfo": "© 2026 Gus Catalano",
+  "LicenseTerms": "",
+  "DevStudio": "Gus Catalano"
+}
