@@ -191,10 +191,10 @@ dotnet restore
 dotnet run
 ```
 
-For a self-contained published build:
+For a self-contained unpackaged published build:
 
 ```pwsh
-dotnet publish -c Release -p:Platform=x64 -r win-x64 --self-contained true -o publish
+dotnet publish -c Release -p:Platform=x64 -r win-x64 --self-contained true -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true -o publish
 ```
 
 ## CI / installers

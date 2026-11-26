@@ -68,6 +68,9 @@ jobs:
             -p:Platform=$env:Platform `
             -r win-x64 `
             --self-contained true `
+            -p:WindowsPackageType=None `
+            -p:WindowsAppSDKSelfContained=true `
+            -p:PublishTrimmed=false `
             -o publish
 
       - name: Install WiX
